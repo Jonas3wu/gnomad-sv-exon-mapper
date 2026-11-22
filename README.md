@@ -5,9 +5,11 @@ gnomAD's structural-variant (SV) pages draw exons without numbers, so it is slow
 It lets you quickly check whether an SV found in a patient's sequencing data is present in gnomAD SV v2.1 or v4.1, and with what allele count, allele number, frequency and homozygote count.
 
 It is a single HTML file. It needs no installation and no server, and it runs in the browser.
-
-**Live tool:** `https://Jonas3wu.github.io/gnomad-sv-exon-mapper/`
-
+**Live tool:** [Jonas3wu.github.io/gnomad-sv-exon-mapper](https://Jonas3wu.github.io/gnomad-sv-exon-mapper/)
+example:
+<img width="3014" height="876" alt="Dup" src="https://github.com/user-attachments/assets/0fb573ee-a91c-4554-966b-aab44f131dba" />
+<img width="1722" height="800" alt="Dup2" src="https://github.com/user-attachments/assets/1a594207-55a6-4476-9521-7b7d52133ccd" />
+<img width="3008" height="1004" alt="Dup3" src="https://github.com/user-attachments/assets/70c443c2-948b-4b62-a355-b64c327da084" />
 > Research and curation aid. Not for clinical decision-making. Not affiliated with gnomAD, the Broad Institute, UCSC or MyGene.info.
 
 ## Quick start
