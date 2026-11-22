@@ -9,7 +9,7 @@ It is a single HTML file. It needs no installation and no server, and it runs in
 
 example:
 <img width="3014" height="876" alt="Dup" src="https://github.com/user-attachments/assets/0fb573ee-a91c-4554-966b-aab44f131dba" />
-<img width="1722" height="800" alt="Dup2" src="https://github.com/user-attachments/assets/1a594207-55a6-4476-9521-7b7d52133ccd" />
+<img width="1722" height="612" alt="Dup2" src="https://github.com/user-attachments/assets/1bade40f-33ab-4e5b-a099-caf8b284670d" />
 <img width="3008" height="1004" alt="Dup3" src="https://github.com/user-attachments/assets/70c443c2-948b-4b62-a355-b64c327da084" />
 > Research and curation aid. Not for clinical decision-making. Not affiliated with gnomAD, the Broad Institute, UCSC or MyGene.info.
 
