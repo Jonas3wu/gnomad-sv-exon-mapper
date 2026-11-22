@@ -1,10 +1,12 @@
 # gnomAD SV Exon Mapper
 
-On gnomAD's structural-variant (SV) pages, exons are drawn without numbers, which makes long genes slow to read (DYNC2H1, for example, has 89 exons). This tool numbers every exon of a transcript and shows which exons each gnomAD SV covers, fully or partly, with coding/UTR status and a reading-frame estimate.
+gnomAD's structural-variant (SV) pages draw exons without numbers, so it is slow to tell which exons an SV covers, especially in long genes (DYNC2H1 has 89 exons). This tool numbers every exon of a transcript and shows which exons each gnomAD SV covers, fully or partly, with coding/UTR status and a reading-frame estimate. 
+
+It lets you quickly check whether an SV found in a patient's sequencing data is present in gnomAD SV v2.1 or v4.1, and with what allele count, allele number, frequency and homozygote count.
 
 It is a single HTML file. It needs no installation and no server, and it runs in the browser.
 
-**Live tool:** `https://<your-username>.github.io/gnomad-sv-exon-mapper/`
+**Live tool:** `https://Jonas3wu.github.io/gnomad-sv-exon-mapper/`
 
 > Research and curation aid. Not for clinical decision-making. Not affiliated with gnomAD, the Broad Institute, UCSC or MyGene.info.
 
