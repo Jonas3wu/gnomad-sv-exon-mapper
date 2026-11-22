@@ -1,0 +1,13 @@
+{
+  "name": "gnomad-sv-exon-mapper",
+  "version": "1.7.0",
+  "private": true,
+  "description": "Browser tool that numbers transcript exons and maps gnomAD structural variants to them.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/core.test.cjs && node tests/e2e.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

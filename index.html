@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>gnomAD SV Exon Mapper</title>
+<style>
+:root{
+--bg:#f4f2ee; --panel:#fffdf9; --panel2:#f0ede7; --line:#d9d3c8; --ink:#1f2328; --muted:#6a6f76; --faint:#9aa0a6;
+--accent:#1f6f6b; --accent-ink:#ffffff;
+--cds:#1f6f6b; --utr:#b9bfc4; --exnum:#ffffff;
+--del:#b8432a; --dup:#2c66a8; --oth:#7a5ea6;
+--key:#e6b800; --keybg:#fff7cc; --colodd:rgba(31,35,40,.035); --colsel:rgba(232,168,20,.30); --sel:#c98400; --sel-ink:#1f1500;
+--ok:#2e7d4f; --err:#b3261e; --warnbg:#fff4dc; --warnline:#e2b04a;
+--fin:#2e7d4f; --fout:#b8432a; --fwarn:#a86a00; --badge-ink:#ffffff; --step:#e8700c; --stepdone:#2e8a55; --stepring:rgba(232,112,12,.32);
+--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+:root{ color-scheme:dark;
+--bg:#15181b; --panel:#1c2024; --panel2:#23282d; --line:#343b42; --ink:#e7e9ea; --muted:#a0a7ae; --faint:#6f777e;
+--accent:#4fb3ab; --accent-ink:#0d1b1a;
+--cds:#3f9c95; --utr:#59626a; --exnum:#ffffff;
+--del:#e2775c; --dup:#6aa4e3; --oth:#ab92d6;
+--key:#e8c13a; --keybg:#3b3412; --colodd:rgba(255,255,255,.035); --colsel:rgba(255,196,60,.24); --sel:#ffc23d; --sel-ink:#1a1200;
+--ok:#6cc495; --err:#f08a80; --warnbg:#33290f; --warnline:#8a6a1c;
+--fin:#6cc495; --fout:#e2775c; --fwarn:#e0a840; --badge-ink:#11161a; --step:#ff8a2a; --stepdone:#3aa66a; --stepring:rgba(255,138,42,.34);
+}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+body{max-width:1240px;margin:0 auto;padding:26px 24px 70px}
+header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+h1{font-size:24px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:4px 0 0;max-width:760px}
+.ver{font-family:var(--mono);font-size:11px;color:var(--muted)}
+h2{font-size:13px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+h2 .n{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--ink);color:var(--bg);font-size:11px;margin-right:8px;letter-spacing:0}
+.setup{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.setup{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.tabs{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;margin-bottom:12px}
+.tab{background:var(--panel2);border:0;padding:7px 14px;font:600 13px var(--sans);color:var(--muted);cursor:pointer}
+.tab+.tab{border-left:1px solid var(--line)}
+.tab.active{background:var(--accent);color:var(--accent-ink)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{font:14px var(--sans);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+textarea{width:100%;font:12px var(--mono);min-height:110px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+button.p{background:var(--accent);color:var(--accent-ink);border:0;border-radius:7px;padding:8px 14px;font:600 13px var(--sans);cursor:pointer}
+button.s{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 12px;font:600 13px var(--sans);cursor:pointer}
+button.s:hover{border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 10px}
+.hint code,code{font-family:var(--mono);font-size:11.5px;background:var(--panel2);padding:1px 4px;border-radius:4px}
+.status{font-size:12.5px;min-height:18px;margin-top:8px;color:var(--muted)}
+.status.ok{color:var(--ok)} .status.err{color:var(--err)}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.mapf{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}
+.mapf select{font-size:12.5px;padding:5px 6px}
+details summary{cursor:pointer;font-size:12.5px;color:var(--muted);margin-top:10px}
+.filters{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin:16px 0 0;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.filters .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px}
+.sw.del{background:var(--del)} .sw.dup{background:var(--dup)} .sw.oth{background:var(--oth)}
+.filters input[type=number]{width:72px}
+.filters input[type=text]{width:160px}
+#emptyState{margin-top:22px;padding:34px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+.summary{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:18px}
+@media(max-width:900px){.summary{grid-template-columns:1fr}}
+.kv{display:flex;gap:10px;font-size:13px;padding:3px 0;border-bottom:1px dotted var(--line)}
+.kv:last-child{border-bottom:0}
+.kv span{width:82px;flex:0 0 auto;color:var(--muted)}
+.kv em{color:var(--muted);font-style:normal}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:999px;margin:0 6px 6px 0;background:var(--panel2)}
+.pill.exo{border-color:var(--accent);color:var(--accent);font-weight:600}
+.warn{background:var(--warnbg);border:1px solid var(--warnline);border-radius:8px;padding:8px 11px;font-size:13px;margin-top:8px}
+.trackcard{margin-top:16px}
+.trackhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+.lg-cds{background:var(--cds)} .lg-utr{background:var(--utr)}
+.lg-full{background:var(--del)} .lg-part{background:var(--del);opacity:.35;outline:1px dashed var(--del);outline-offset:-1px}
+.trackbox{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+#trackGrid{display:grid;width:max-content;grid-template-rows:74px auto}
+.corner{position:sticky;top:0;left:0;z-index:4;background:var(--panel);border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:flex-end;padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.thead{position:sticky;top:0;z-index:3;background:var(--panel);border-bottom:1px solid var(--line)}
+.tlab{position:sticky;left:0;z-index:2;background:var(--panel);border-right:1px solid var(--line)}
+svg text{font-family:var(--sans)}
+.exbg{fill:var(--utr)} .excds{fill:var(--cds)}
+.exnum{fill:var(--exnum);font-size:11px;font-weight:700;pointer-events:none}
+.exmark{fill:var(--muted);font-size:9px;font-weight:600;letter-spacing:.04em}
+.axis{fill:var(--faint);font-size:9.5px}
+g.ex{cursor:pointer} g.ex:hover .exbg{filter:brightness(.92)}
+g.ex.sel .exnum{font-size:12.5px}
+.exselring{fill:none;stroke:var(--sel);stroke-width:3}
+.qbracket{fill:none;stroke:var(--sel);stroke-width:2.5}
+.qlabbg{fill:var(--sel)}
+.qlab{fill:var(--sel-ink);font-size:10.5px;font-weight:700}
+.qedge{stroke:var(--sel);stroke-width:2}
+.past{stroke-width:0;opacity:.85}
+.idw{display:inline-flex;align-items:baseline;gap:5px;margin:0 10px 4px 0}
+.why{font-size:11px;color:var(--muted)}
+.gloss{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:12.5px;margin:0}
+.gloss dt{font-weight:700;font-family:var(--mono);font-size:12px}
+.gloss dd{margin:0;color:var(--muted)}
+.gloss h3{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:10px 0 2px}
+.col{fill:transparent} .col.odd{fill:var(--colodd)} .col.sel{fill:var(--colsel)}
+.cell,.link,.intr,.tbadge{stroke-width:1.2}
+.tdel{fill:var(--del);stroke:var(--del)} .tdup{fill:var(--dup);stroke:var(--dup)} .toth{fill:var(--oth);stroke:var(--oth)}
+.cell.part{fill-opacity:.32;stroke-dasharray:3 2}
+.link{stroke-width:0;opacity:.75}
+.tbt{fill:var(--badge-ink);font-size:9.5px;font-weight:700}
+.lid{fill:var(--ink);font-size:11.5px;font-family:var(--mono)}
+.lac{fill:var(--muted);font-size:11px}
+.grid2{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+.qform{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.qform input[type=number]{width:80px}
+.qhead{margin:12px 0 8px;font-size:13.5px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+td:not(.l),td.mono,td.nw{white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;background:var(--panel);position:sticky;top:0;z-index:1}
+th.l,td.l{text-align:left}
+td.mono{font-family:var(--mono);font-size:11.5px}
+.qt tr.strong td:first-child{font-weight:600}
+.qt .sub{font-weight:400;color:var(--muted);font-size:11.5px}
+.qt{width:auto;min-width:420px;margin-bottom:12px} .qt tr.zero td{color:var(--faint)}
+.btns{display:flex;gap:8px}
+td .tag.flt{margin-left:6px;font-family:var(--sans);color:var(--err);border-color:var(--err)}
+.tblwrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+.tblwrap table th{border-bottom:1px solid var(--line)}
+tr.dim td{color:var(--faint)}
+tr.qsel td{background:var(--colsel)}
+/* key results (AC / AN / AF / Hom): yellow frame */
+th.k,td.k{background:var(--keybg)} td.k{font-weight:600;color:var(--ink)}
+th.k{color:var(--ink)} .k.kl{border-left:2px solid var(--key)} .k.kr{border-right:2px solid var(--key)}
+thead th.k{border-top:2px solid var(--key)} tbody tr:last-child td.k{border-bottom:2px solid var(--key)}
+td.mt{font-weight:600;white-space:nowrap} td.mt .why{display:block;font-weight:400;color:var(--muted);font-size:11px;white-space:normal}
+td .fl{display:block;color:var(--muted);font-size:11px}
+.svnote{font-size:12.5px;color:var(--muted);margin:8px 2px 0}
+.svnote button{margin-left:6px}
+.cnt{font:600 12px var(--sans);color:var(--muted);margin-left:8px}
+.muted{color:var(--faint)}
+.tdel-t{color:var(--del);font-weight:700} .tdup-t{color:var(--dup);font-weight:700} .toth-t{color:var(--oth);font-weight:700}
+.fin{color:var(--fin)} .fout{color:var(--fout)} .fwarn{color:var(--fwarn)}
+.tag{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+.tbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap}
+.notes{font-size:12.5px;color:var(--muted);margin:0;padding-left:18px}
+.notes li{margin:5px 0}
+footer{margin-top:26px;font-size:11.5px;color:var(--faint)}
+.stepb{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+background:var(--step);color:#fff;font:700 11.5px var(--sans);margin-right:7px;vertical-align:-4px;flex:0 0 auto;line-height:1}
+.stepb.done{background:var(--stepdone)}
+button.p,.tab{display:inline-flex;align-items:center;justify-content:center}
+button.p .stepb,.tab .stepb{vertical-align:0}
+.stepb.next{box-shadow:0 0 0 3px var(--stepring);animation:steppulse 1.6s ease-in-out infinite}
+.stepb.inline{margin:0 2px;vertical-align:-3px}
+.flab{display:inline-flex;align-items:center} .flab .stepb,.filters .stepb{vertical-align:0}
+.filters .lbl{display:inline-flex;align-items:center}
+@keyframes steppulse{50%{box-shadow:0 0 0 6px var(--stepring)}}
+@media(prefers-reduced-motion:reduce){.stepb.next{animation:none}}
+.stepper{display:flex;flex-wrap:wrap;gap:8px 0;align-items:center;margin:0 0 14px;font-size:13px;color:var(--muted)}
+.stepper .st{display:inline-flex;align-items:center}
+.stepper .st+.st::before{content:'→';margin:0 12px;color:var(--faint)}
+.nextstep{color:var(--step)}
+#emptyState b{color:var(--ink)}
+.recent{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.recent .rlbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:2px}
+.chip{font:600 12px var(--mono);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chipclear{font:12px var(--sans);color:var(--muted);background:none;border:0;cursor:pointer;text-decoration:underline;padding:3px 4px}
+.kbd{font-size:11.5px;color:var(--muted);align-self:center}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>gnomAD SV Exon Mapper</h1>
+<p class="sub">Numbers every exon of a transcript and shows which exons each gnomAD structural variant covers, fully or partly, with coding/non-coding status and a frame estimate.</p>
+</div>
+<div class="ver">v1.7.0 &middot; research &amp; curation aid &middot; not for clinical decision-making</div>
+</header>
+
+<div class="stepper" aria-label="Steps">
+<span class="st"><span class="stepb" data-step="1">1</span>Fetch by gene</span>
+<span class="st"><span class="stepb" data-step="2">2</span>Gene symbol &rarr; Look up</span>
+<span class="st"><span class="stepb" data-step="3">3</span>Transcript &rarr; Use</span>
+<span class="st"><span class="stepb" data-step="4">4</span>Fetch from gnomAD</span>
+<span class="st"><span class="stepb" data-step="5">5</span>Read SVs</span>
+<span class="st"><span class="stepb" data-step="6">6</span>Show</span>
+<span class="st"><span class="stepb" data-step="7">7</span>Sort</span>
+</div>
+<div class="setup">
+<section class="card" aria-labelledby="h-tx">
+<h2 id="h-tx">Transcript</h2>
+<div class="tabs" role="tablist">
+<button class="tab active" role="tab" aria-selected="true" data-panel="pFetch"><span class="stepb" data-step="1">1</span>Fetch by gene</button>
+<button class="tab" role="tab" aria-selected="false" data-panel="pPaste">Paste UCSC row</button>
+<button class="tab" role="tab" aria-selected="false" data-panel="pDemo">Demo</button>
+</div>
+<div class="tabpanel" id="pFetch">
+<div class="row">
+<label class="f" style="flex:1;min-width:140px"><span class="flab"><span class="stepb" data-step="2">2</span>Gene symbol</span><input type="text" id="symIn" placeholder="e.g. DYNC2H1" autocomplete="off" list="geneHist"></label>
+<label class="f" style="min-width:150px">Transcript accession (optional)<input type="text" id="accIn" placeholder="e.g. NM_015909.4" autocomplete="off"></label>
+<label class="f">Genome build<select id="buildIn"><option value="hg38">GRCh38 (hg38)</option><option value="hg19">GRCh37 (hg19)</option></select></label>
+<button class="p" id="lookupBtn"><span class="stepb" data-step="2">2</span>Look up</button>
+</div>
+<div class="recent" id="recentGenes" hidden></div>
+<datalist id="geneHist"></datalist>
+<div class="status" id="fetchStatus"></div>
+<div id="txWrap" hidden>
+<div class="row" style="margin-top:8px">
+<label class="f" style="flex:1;min-width:260px"><span class="flab"><span class="stepb" data-step="3">3</span>Transcript</span><select id="txSel"></select></label>
+<button class="p" id="useTxBtn"><span class="stepb" data-step="3">3</span>Use</button>
+</div>
+</div>
+<p class="hint">The <b>MANE Select</b> transcript is listed first and selected by default, followed by RefSeq Select and curated RefSeq. To use a different transcript, enter its accession (e.g. NM_ number) to auto-select it. Uses MyGene.info (gene location) and the UCSC Genome Browser API (exon coordinates). Needs internet access from your browser; if your network blocks it, use <b>Paste UCSC row</b>.</p>
+</div>
+<div class="tabpanel" id="pPaste" hidden>
+<p class="hint">In the <b>UCSC Table Browser</b>: choose the genome, group <i>Genes and Gene Predictions</i>, track <i>NCBI RefSeq</i>, table <i>RefSeq Select</i> (or the <i>MANE</i> track), region = your gene symbol, output format <i>all fields from selected table</i>. Copy the row for your transcript (header optional).</p>
+<textarea id="rowIn" placeholder="name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds ..."></textarea>
+<div class="row" style="margin-top:8px">
+<label class="f">Build of this row<select id="pasteBuild"><option value="hg38">GRCh38 (hg38)</option><option value="hg19">GRCh37 (hg19)</option></select></label>
+<button class="p" id="pasteBtn" title="Replaces steps 1–3 when you paste a UCSC row"><span class="stepb" data-step="3">3</span>Load transcript</button><span class="kbd">or Ctrl+Enter</span>
+</div>
+<div class="status" id="pasteStatus"></div>
+</div>
+<div class="tabpanel" id="pDemo" hidden>
+<p class="hint">Loads a real transcript model (CSNK2A1, 14 exons, minus strand, GRCh38) with <b>synthetic</b> SVs chosen to show each case: full and partial exon overlap, intronic, ATG and stop loss, whole-gene, UTR-only, inversion, and a failed-filter call. These are not gnomAD records.</p>
+<button class="s" id="demoBtn">Load demo</button>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-sv">
+<h2 id="h-sv">gnomAD SV data</h2>
+<div class="row">
+<label class="f" style="flex:1;min-width:120px"><span class="flab"><span class="stepb" data-step="4">4</span>Gene symbol</span><input type="text" id="svGene" placeholder="e.g. DYNC2H1" autocomplete="off" list="geneHist"></label>
+<label class="f">Dataset<select id="dataset"><option value="v4">gnomAD SV v4.1 (GRCh38)</option><option value="v2">gnomAD SV v2.1 (GRCh37)</option><option value="other">Other / not specified</option></select></label>
+<button class="p" id="gnomadBtn"><span class="stepb" data-step="4">4</span>Fetch from gnomAD</button>
+</div>
+<div class="status" id="gnomadStatus"></div>
+<p class="hint"><b>Fetch from gnomAD</b> pulls the gene's SV table directly from gnomAD's public API and fills the box below. Please avoid rapid repeated requests. If it can't connect, use the manual route:</p>
+<div class="row"><label class="f">Upload CSV / TSV<input type="file" id="svFile" accept=".csv,.tsv,.txt,text/csv,text/plain"></label></div>
+<p class="hint">On the gnomAD gene page (SV dataset selected), export the variant table to CSV if the page offers it, or copy the table <b>including its header row</b> and paste below. A plain list also works, one SV per line: <code>chr2:103,200,000-103,250,000 DEL AC=3</code></p>
+<textarea id="svIn" placeholder="Variant ID, Chrom, Position, End, Class, Allele Count, ..."></textarea>
+<div class="row" style="margin-top:8px">
+<button class="p" id="readBtn"><span class="stepb" data-step="5">5</span>Read SVs</button><span class="kbd">Ctrl+Enter · runs by itself after step 4</span>
+<button class="s" id="clearSvBtn">Clear</button>
+</div>
+<div class="status" id="svStatus"></div>
+<details id="mapWrap" hidden>
+<summary>Column mapping (adjust if a column was not recognised)</summary>
+<div class="mapgrid" id="mapGrid"></div>
+</details>
+</section>
+</div>
+
+<div class="filters" role="group" aria-label="Filters">
+<span class="lbl"><span class="stepb" data-step="6">6</span>Show</span>
+<label class="chk"><input type="checkbox" id="fDEL" checked><span class="sw del"></span>DEL</label>
+<label class="chk"><input type="checkbox" id="fDUP" checked><span class="sw dup"></span>DUP</label>
+<label class="chk"><input type="checkbox" id="fOTHER" checked><span class="sw oth"></span>Other (INV, INS, CPX, …)</label>
+<label class="chk" title="gnomAD's own quality filter for each SV record (not your exon selection). Ticked = show only SVs that passed all gnomAD quality filters, as the gnomAD website does by default. Untick to also see SVs gnomAD flagged (e.g. UNRESOLVED, LOW_CALL_RATE). Pasted gnomAD exports have no filter column."><input type="checkbox" id="fPass" checked>gnomAD quality filter: PASS only</label>
+<label class="chk">Min AC <input type="number" id="fAC" min="0" value="0"></label>
+<label class="chk">ID contains <input type="text" id="fText" placeholder="optional"></label>
+<label class="chk"><span class="stepb" data-step="7">7</span>Sort <select id="sortSel"><option value="exon">by exon</option><option value="ac">by allele count</option><option value="size">by size</option><option value="pos">by genomic position</option></select></label>
+</div>
+
+<div id="emptyState" role="status">Load a transcript (step 1) to see its numbered exons. Then add gnomAD SV rows (step 2).</div>
+
+<div id="results" hidden>
+<div class="summary">
+<section class="card"><h2>Transcript</h2><div id="txSummary"></div></section>
+<section class="card"><h2>SVs</h2><div id="svSummary"></div><div id="warnBox"></div></section>
+</div>
+
+<section class="card trackcard" aria-labelledby="h-track">
+<div class="trackhead">
+<h2 id="h-track" style="margin:0">Exon map</h2>
+<div class="legend">
+<span><i class="lg-cds"></i>coding</span><span><i class="lg-utr"></i>non-coding / UTR</span>
+<span><i class="lg-full"></i>exon fully covered</span><span><i class="lg-part"></i>breakpoint inside exon</span>
+<span>&#9670; intronic</span><span>&#9654; runs past gene end</span><span><i style="background:var(--colsel);outline:2px solid var(--sel);outline-offset:-2px"></i>query range</span><span>hover for details &middot; click exon numbers to query</span>
+</div>
+</div>
+<div class="trackbox"><div id="trackGrid"></div></div>
+</section>
+
+<div class="grid2">
+<section class="card" aria-labelledby="h-q">
+<div class="tbar"><h2 id="h-q" style="margin:0">Which SVs match my variant?<span class="cnt" id="svCount"></span></h2>
+<div class="btns"><button class="s" id="copyBtn" disabled>Copy summary</button><button class="s" id="expSv">Export CSV</button></div></div>
+<div class="qform">
+<label class="f" title="Same setting as Show above: changing one changes the other">Type<select id="qType"><option value="DEL">Deletion (DEL)</option><option value="DUP">Duplication (DUP)</option><option value="OTHER">Other (INV, INS, CPX, …)</option><option value="ALL">All types</option></select></label>
+<label class="f">From exon<input type="number" id="qa" min="1"></label>
+<label class="f">To exon<input type="number" id="qb" min="1"></label>
+</div>
+<div id="qOut"></div>
+<div class="tblwrap"><table id="svTable"></table></div>
+<div class="svnote" id="svNote"></div>
+</section>
+
+<section class="card" aria-labelledby="h-ext">
+<div class="tbar"><h2 id="h-ext" style="margin:0">Exons and SV counts</h2><button class="s" id="expEx">Export CSV</button></div>
+<div class="tblwrap"><table id="exTable"></table></div>
+</section>
+
+<section class="card">
+<h2>Limits &mdash; read before using results</h2>
+<ul class="notes">
+<li><b>Transcript and build must match.</b> Exon numbers and coding status follow the transcript you load; MANE Select is the default; switch if you describe variants against another transcript. gnomAD SV records are genomic, so no conversion to MANE is needed, but gnomAD's own consequence labels follow its transcript and may number exons differently. gnomAD SV v4.1 is GRCh38 and v2.1 is GRCh37; a mismatch shifts every exon.</li>
+<li><b>Breakpoints are approximate.</b> gnomAD-SV breakpoint precision varies by evidence type. Calls with a breakpoint inside an exon, and frame estimates marked <b>~</b>, should be checked against the record.</li>
+<li><b>Frame is arithmetic only.</b> Coding nt affected mod 3, assuming a simple deletion or a tandem duplication. Splicing, NMD, and PVS1 decision rules (e.g. the ClinGen SVI recommendations: start loss, last/penultimate exon, &gt;10% of protein) are not applied; flags point to where they matter.</li>
+<li><b>Small exon-level events are under-represented</b> in population SV callsets (median gnomAD SV is a few hundred bp), so absence here is weaker evidence than for an SNV.</li>
+<li><b>This is not a classification.</b> How population SV data applies to criteria such as PM2 or BA1/BS1 depends on your own guidelines; treat matches as supporting information, not as a criterion on their own.</li>
+<li>Pasted data stays in your browser. Transcript lookup sends only the gene symbol and region to MyGene.info and UCSC; <b>Fetch from gnomAD</b> sends only the gene symbol and dataset to gnomAD.</li>
+</ul>
+</section>
+</div>
+</div>
+<section class="card" style="margin-top:16px" aria-labelledby="h-gl">
+<h2 id="h-gl">Abbreviations and terms</h2>
+<dl class="gloss">
+<h3>Structural variant classes (gnomAD SV)</h3>
+<dt>SV</dt><dd>Structural variant</dd>
+<dt>DEL</dt><dd>Deletion</dd>
+<dt>DUP</dt><dd>Duplication</dd>
+<dt>INS</dt><dd>Insertion</dd>
+<dt>INV</dt><dd>Inversion</dd>
+<dt>CPX</dt><dd>Complex SV (more than one rearrangement in one allele)</dd>
+<dt>CTX</dt><dd>Reciprocal chromosomal translocation</dd>
+<dt>BND</dt><dd>Breakend (unresolved rearrangement)</dd>
+<dt>CNV</dt><dd>Copy-number variant</dd>
+<dt>MCNV</dt><dd>Multi-allelic copy-number variant</dd>
+<h3>Population data</h3>
+<dt>AC</dt><dd>Allele count: number of alleles carrying the SV</dd>
+<dt>AN</dt><dd>Allele number: total alleles genotyped at the site</dd>
+<dt>AF</dt><dd>Allele frequency: AC &divide; AN</dd>
+<dt>Hom</dt><dd>Number of homozygous individuals</dd>
+<dt>PASS</dt><dd>Passed all gnomAD quality filters (other values name the failed filter)</dd>
+<h3>Transcript and sequence</h3>
+<dt>E1, E2 &hellip;</dt><dd>Exon numbers on the loaded transcript, 5&prime; to 3&prime;</dd>
+<dt>CDS</dt><dd>Coding sequence</dd>
+<dt>UTR</dt><dd>Untranslated region (5&prime;UTR before the start codon, 3&prime;UTR after the stop codon)</dd>
+<dt>ATG</dt><dd>Start codon</dd>
+<dt>nt / bp / kb / Mb</dt><dd>Nucleotides / base pairs / kilobases / megabases</dd>
+<dt>~</dt><dd>Approximate: a breakpoint falls inside an exon</dd>
+<dt>MANE Select</dt><dd>Matched Annotation from NCBI and EMBL-EBI: one agreed RefSeq/Ensembl transcript per gene</dd>
+<dt>RefSeq</dt><dd>NCBI Reference Sequence (NM_ = coding, NR_ = non-coding transcripts)</dd>
+<dt>GRCh38 / hg38</dt><dd>Current human reference genome build (GRCh37 / hg19 is the previous build)</dd>
+<h3>Interpretation</h3>
+<dt>NMD</dt><dd>Nonsense-mediated mRNA decay</dd>
+<dt>ACMG/AMP</dt><dd>American College of Medical Genetics and Genomics / Association for Molecular Pathology variant-classification framework</dd>
+<dt>PVS1, PM2</dt><dd>ACMG/AMP criteria: null variant in a loss-of-function gene; absent or rare in population databases</dd>
+<dt>ClinGen</dt><dd>Clinical Genome Resource</dd>
+<dt>UCSC</dt><dd>University of California, Santa Cruz Genome Browser</dd>
+<dt>Reporting transcript</dt><dd>The transcript a variant is described against (HGVS nomenclature)</dd>
+</dl>
+</section>
+<footer>Exon coordinates from UCSC (0-based) are shown 1-based. Total AC sums allele counts of separate SV records. Not affiliated with gnomAD, the Broad Institute, UCSC or MyGene.info. MIT License.</footer>
+
+<script>
+(function(){
+/* ===== gnomAD SV exon mapper: core logic (pure functions, no DOM) ===== */
+'use strict';
+
+const CHROM_TOKEN=/^chr(\d{1,2}|X|Y|M|MT)(_\w+)?$/i;
+function stripChr(c){ return String(c||'').trim().replace(/^chr/i,'').toUpperCase().replace(/^MT$/,'M'); }
+function toInt(v){
+if(v===null||v===undefined) return NaN;
+const s=String(v).replace(/[,\s]/g,'');
+return /^-?\d+$/.test(s)? parseInt(s,10) : NaN;
+}
+/* "4401", "4,401", "4.4 kb", "120 bp", "1.2 Mb" -> bp */
+function parseSize(v){
+if(v===null||v===undefined) return NaN;
+const s=String(v).trim().replace(/,/g,'');
+const m=s.match(/^(-?[\d.]+)\s*(bp|b|kb|k|mb|m)?$/i);
+if(!m) return NaN;
+const n=parseFloat(m[1]); if(!isFinite(n)) return NaN;
+const u=(m[2]||'bp').toLowerCase();
+const f= u==='kb'||u==='k' ? 1e3 : (u==='mb'||u==='m' ? 1e6 : 1);
+return Math.round(Math.abs(n)*f);
+}
+function parseIntList(s){
+if(Array.isArray(s)) return s.map(Number);
+return String(s||'').replace(/"/g,'').split(',').filter(x=>x!=='').map(Number);
+}
+
+/* ---------- transcript model ----------
+raw: {name,name2,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,starts[],ends[],source}
+UCSC coordinates are 0-based half-open; internally 1-based inclusive (s1,e1). */
+function buildGene(raw){
+if(raw.strand!=='+' && raw.strand!=='-') throw new Error('Strand must be + or -.');
+if(!raw.starts.length || raw.starts.length!==raw.ends.length) throw new Error('Exon start/end lists are missing or unequal.');
+if(raw.starts.some(isNaN)||raw.ends.some(isNaN)) throw new Error('Exon coordinates are not numbers.');
+const hasCds = raw.cdsEnd>raw.cdsStart;
+let ex = raw.starts.map((s,i)=>{
+const e=raw.ends[i];
+const cs=hasCds? Math.max(s,raw.cdsStart):0, ce=hasCds? Math.min(e,raw.cdsEnd):0;
+const codingLen=Math.max(0,ce-cs);
+return {s1:s+1, e1:e, len:e-s, codingLen,
+cdsS1: codingLen>0? cs+1:null, cdsE1: codingLen>0? ce:null};
+});
+ex.sort((a,b)=>a.s1-b.s1);
+if(raw.strand==='-') ex.reverse(); // number exons 5'->3'
+let firstC=-1, lastC=-1;
+ex.forEach((x,i)=>{ if(x.codingLen>0){ if(firstC<0) firstC=i; lastC=i; } });
+let cum=0;
+ex.forEach((x,i)=>{
+x.num=i+1;
+x.phaseIn=cum%3; cum+=x.codingLen; x.phaseOut=cum%3;
+x.isStart=(i===firstC); x.isStop=(i===lastC);
+x.kind = x.codingLen>0 ? 'cds' : (firstC<0 ? 'nc' : (i<firstC ? 'utr5' : 'utr3'));
+if(x.kind==='cds'){
+x.label = x.codingLen===x.len ? 'coding'
+: (x.isStart&&x.isStop ? 'coding (ATG + stop; UTR parts)'
+: (x.isStart ? 'coding (ATG exon; part 5\u2032UTR)'
+: (x.isStop ? 'coding (stop exon; part 3\u2032UTR)' : 'coding (partial)')));
+} else x.label = {utr5:'non-coding (5\u2032UTR)',utr3:'non-coding (3\u2032UTR)',nc:'non-coding (no CDS)'}[x.kind];
+});
+const gS=Math.min(...ex.map(x=>x.s1)), gE=Math.max(...ex.map(x=>x.e1));
+const introns=[]; // intron k lies between exon k and k+1
+for(let k=0;k<ex.length-1;k++){
+const a=ex[k], b=ex[k+1];
+introns.push({num:k+1,
+lo: raw.strand==='+' ? a.e1+1 : b.e1+1,
+hi: raw.strand==='+' ? b.s1-1 : a.s1-1});
+}
+let atg=null, stop=null;
+if(hasCds && cum>=6){
+if(raw.strand==='+'){ atg=[raw.cdsStart+1, raw.cdsStart+3]; stop=[raw.cdsEnd-2, raw.cdsEnd]; }
+else { atg=[raw.cdsEnd-2, raw.cdsEnd]; stop=[raw.cdsStart+1, raw.cdsStart+3]; }
+}
+return Object.assign({}, raw, {exons:ex, introns, gS, gE, cdsLen:cum,
+aa: cum>0? Math.max(0,Math.round(cum/3)-1):0, atg, stop, hasCds: hasCds && cum>0,
+codingExonCount: ex.filter(x=>x.codingLen>0).length});
+}
+
+/* ---------- UCSC rows ----------
+Accepts Table Browser genePred rows with or without a leading bin column:
+[bin] name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds [score name2 ...]
+and knownGene rows (... exonEnds proteinID alignID). */
+function parseGenePredRow(text){
+const lines=String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#'));
+if(!lines.length) throw new Error('No data row found.');
+let t=null, idx=-1;
+for(let i=lines.length-1;i>=0;i--){
+const tok=lines[i].split(/\s+/), j=tok.findIndex(x=>CHROM_TOKEN.test(x));
+if(j>=0){ t=tok; idx=j; break; }
+}
+if(!t) throw new Error('No chromosome field (e.g. chr2) found in the pasted row.');
+// bigGenePred layout (e.g. UCSC "MANE" track): chrom chromStart chromEnd name score strand
+// thickStart thickEnd reserved blockCount blockSizes chromStarts name2 ...
+if(/^\d+$/.test(t[idx+1]||'') && /^[+-]$/.test(t[idx+5]||'') && t.length>=idx+12){
+const base=+t[idx+1], sizes=parseIntList(t[idx+10]), offs=parseIntList(t[idx+11]);
+if(sizes.length!==offs.length) throw new Error('blockSizes and chromStarts lengths differ.');
+const n2=t[idx+12]&&!/^\d+$/.test(t[idx+12])? t[idx+12]:'';
+return buildGene({name:t[idx+3],name2:n2,chrom:t[idx],strand:t[idx+5],
+txStart:base,txEnd:+t[idx+2],cdsStart:+t[idx+6],cdsEnd:+t[idx+7],
+starts:offs.map(o=>base+o),ends:offs.map((o,i)=>base+o+sizes[i]),source:'pasted UCSC row (bigGenePred)'});
+}
+if(idx<1) throw new Error('Expected a transcript name before the chromosome field (genePred layout).');
+if(t.length<idx+9) throw new Error('Row has too few columns after the chromosome field.');
+const name=t[idx-1], strand=t[idx+1];
+const starts=parseIntList(t[idx+7]), ends=parseIntList(t[idx+8]);
+// name2 exists only in the ncbiRefSeq/refGene layout, where a numeric score precedes it
+let name2='';
+if(t[idx+9]!==undefined && /^\d+$/.test(t[idx+9]) && t[idx+10] && !/^\d+$/.test(t[idx+10])) name2=t[idx+10];
+return buildGene({name,name2,chrom:t[idx],strand,
+txStart:+t[idx+2],txEnd:+t[idx+3],cdsStart:+t[idx+4],cdsEnd:+t[idx+5],
+starts,ends,source:'pasted UCSC row'});
+}
+function geneFromUcscItem(it, source){
+return buildGene({name:it.name,name2:it.name2||it.geneName||'',chrom:it.chrom,strand:it.strand,
+txStart:+it.txStart,txEnd:+it.txEnd,cdsStart:+it.cdsStart,cdsEnd:+it.cdsEnd,
+starts:parseIntList(it.exonStarts),ends:parseIntList(it.exonEnds),source:source||''});
+}
+
+/* ---------- SV table parsing ---------- */
+function parseDelimited(text){
+const lines=String(text||'').split(/\r?\n/).filter(l=>l.trim()!=='');
+if(!lines.length) return [];
+const delim = lines.some(l=>l.indexOf('\t')>=0) ? '\t' : ',';
+return lines.map(l=>{
+if(delim==='\t') return l.split('\t').map(s=>s.trim().replace(/^"|"$/g,''));
+const out=[]; let cur='', q=false;
+for(let i=0;i<l.length;i++){
+const c=l[i];
+if(c==='"'){ if(q && l[i+1]==='"'){cur+='"';i++;} else q=!q; }
+else if(c===',' && !q){ out.push(cur.trim()); cur=''; }
+else cur+=c;
+}
+out.push(cur.trim()); return out;
+});
+}
+function normHeader(h){ return String(h||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+const FIELD_ALIASES={
+id:['variantid','id','svid','name','variant','svname'],
+chrom:['chrom','chromosome','chr','contig'],
+start:['start','pos','position','begin','startposition','svstart'],
+end:['end','stop','endposition','svend'],
+size:['size','length','svlen','svsize'],
+type:['type','svtype','class','svclass','variantclass'],
+ac:['allelecount','ac','altallelecount'],
+an:['allelenumber','an'],
+af:['allelefrequency','af'],
+filter:['filter','filters','qc','flags'],
+hom:['homozygotecount','nhomalt','homozygotes','homalt','numberofhomozygotes']
+};
+const FIELD_LABELS={id:'Variant ID',chrom:'Chrom',start:'Start / position',end:'End',size:'Size',
+type:'SV type / class',ac:'Allele count',an:'Allele number',af:'Allele frequency',filter:'Filter',hom:'Homozygotes'};
+function looksLikeHeader(row){
+const known=[].concat(...Object.values(FIELD_ALIASES));
+return row.filter(c=>known.includes(normHeader(c))).length>=2;
+}
+function autoMap(headers){
+const nh=headers.map(normHeader), map={};
+for(const f of Object.keys(FIELD_ALIASES)){
+for(const a of FIELD_ALIASES[f]){ const i=nh.indexOf(a); if(i>=0){ map[f]=i; break; } }
+}
+return map;
+}
+function parseRange(s){
+if(s===undefined||s===null) return null;
+const str=String(s);
+let m=str.match(/(?:chr)?(\d{1,2}|X|Y|M|MT)\s*[:\-_]\s*([\d,]+)\s*[-\u2013_]\s*([\d,]+)/i);
+if(m) return {chrom:m[1],start:toInt(m[2]),end:toInt(m[3])};
+m=str.match(/^\s*([\d,]+)\s*[-\u2013]\s*([\d,]+)\s*$/);
+// "20-495000" is chromosome-position, not a range: a real start coordinate is never <= 25
+if(m && toInt(m[1])>25) return {chrom:null,start:toInt(m[1]),end:toInt(m[2])};
+return null;
+}
+function parsePoint(s){ // "chr20:495000" or "20-495000"
+const m=String(s||'').match(/^\s*(?:chr)?(\d{1,2}|X|Y|M|MT)\s*[:\-_]\s*([\d,]+)\s*$/i);
+return m? {chrom:m[1], pos:toInt(m[2])} : null;
+}
+function normType(t){
+const s=String(t||'').trim().toUpperCase();
+const m={DELETION:'DEL',DUPLICATION:'DUP',INSERTION:'INS',INVERSION:'INV',COMPLEX:'CPX',
+'MULTIALLELIC CNV':'MCNV','MULTI-ALLELIC CNV':'MCNV','COPY NUMBER VARIANT':'CNV',
+TRANSLOCATION:'CTX','BREAKEND':'BND','MULTI CNV':'MCNV',OTHER:'OTH'};
+return m[s]||s||'UNK';
+}
+function numOrNull(v){
+if(v===undefined||v===null||v==='') return null;
+const n=parseFloat(String(v).replace(/,/g,'')); return isFinite(n)?n:null;
+}
+function rowsToSVs(rows, map, defaultChrom){
+const svs=[], skipped=[];
+rows.forEach((r,ri)=>{
+const g=f=> (map[f]!==undefined && map[f]!==null && map[f]>=0) ? r[map[f]] : undefined;
+if(r.every(c=>String(c).trim()==='')) return;
+let chrom=g('chrom'), start=toInt(g('start')), end=toInt(g('end'));
+// BND/CTX positions come as "1:250-251|5:1000-1001" (export) or "1:250 | 5:1000" (copied table)
+let posTxt=g('start'), alt=null;
+if(posTxt!==undefined && String(posTxt).indexOf('|')>=0){
+const parts=String(posTxt).split('|'); posTxt=parts[0].trim();
+const a2=parseRange(parts[1])||parsePoint(parts[1]);
+if(a2) alt={chrom:stripChr(a2.chrom), start:a2.start!==undefined?a2.start:a2.pos, end:a2.end!==undefined?a2.end:a2.pos};
+}
+const rg=parseRange(posTxt), pt=parsePoint(posTxt);
+if(rg){ start=rg.start; end=rg.end; if(!chrom && rg.chrom) chrom=rg.chrom; }
+else if(pt){ start=pt.pos; if(!chrom) chrom=pt.chrom; }
+if(isNaN(end)){ const rg2=parseRange(g('end')); if(rg2) end=rg2.end; }
+const size=parseSize(g('size'));
+const id=String(g('id')||('row'+(ri+1)));
+let type=normType(g('type'));
+if(type==='UNK'){
+const m=id.match(/(?:^|[_\-])(DEL|DUP|INS|INV|CPX|CTX|BND|MCNV|CNV)(?:[_\-]|$)/i);
+if(m) type=m[1].toUpperCase();
+}
+// an insertion is a point at its position; its Size is the inserted length, not a span
+if(type==='INS' && !isNaN(start)) end=start;
+if((type==='BND'||type==='CTX') && !isNaN(start) && isNaN(end)) end=start; // breakends are points
+if(!isNaN(start) && isNaN(end) && !isNaN(size)) end=start+size-1;
+if(isNaN(start)||isNaN(end)){ skipped.push({row:ri+1,reason:'no usable start/end'}); return; }
+if(!chrom){ const m=id.match(/CHR(\d{1,2}|X|Y|M)/i); if(m) chrom=m[1]; }
+chrom = stripChr(chrom||defaultChrom||'');
+const lo=Math.min(start,end), hi=Math.max(start,end);
+svs.push({id, chrom, start:lo, end:hi, type,
+size: !isNaN(size)? size : hi-lo+1,
+ac:numOrNull(g('ac')), an:numOrNull(g('an')), af:numOrNull(g('af')),
+hom:numOrNull(g('hom')), filter:String(g('filter')||'').trim(), alt});
+});
+return {svs, skipped};
+}
+/* quick list, one SV per line: "chr2:15,519,938-15,600,000 DEL AC=3 AF=1e-5" */
+function parseQuickList(text, defaultChrom){
+const svs=[], skipped=[];
+String(text||'').split(/\r?\n/).forEach((line,i)=>{
+const l=line.trim(); if(!l) return;
+const rg=parseRange(l);
+if(!rg){ skipped.push({row:i+1,reason:'no coordinate range'}); return; }
+const tm=l.match(/\b(DEL|DUP|INS|INV|CPX|CTX|BND|MCNV|CNV|DELETION|DUPLICATION|INSERTION|INVERSION)\b/i);
+const am=l.match(/\bAC\s*[=:]\s*([\d.,]+)/i), fm=l.match(/\bAF\s*[=:]\s*([\d.eE\-+]+)/i);
+const lo=Math.min(rg.start,rg.end), hi=Math.max(rg.start,rg.end);
+const qt=tm? normType(tm[1]):'UNK';
+svs.push({id:'SV'+(svs.length+1), chrom:stripChr(rg.chrom||defaultChrom), start:lo, end: qt==='INS'? lo:hi,
+type: qt, size:hi-lo+1,
+ac: am? numOrNull(am[1]):null, an:null, af: fm? numOrNull(fm[1]):null, hom:null, filter:''});
+});
+return {svs, skipped};
+}
+/* Decide format automatically: header table vs quick list */
+function parseSVText(text, defaultChrom){
+const rows=parseDelimited(text);
+if(rows.length && looksLikeHeader(rows[0])){
+const headers=rows[0], map=autoMap(headers);
+return Object.assign({format:'table', headers, map, rows:rows.slice(1)}, rowsToSVs(rows.slice(1),map,defaultChrom));
+}
+return Object.assign({format:'list', headers:null, map:null, rows:null}, parseQuickList(text,defaultChrom));
+}
+
+/* ---------- map one SV onto the transcript ---------- */
+function ovl(a1,a2,b1,b2){ const lo=Math.max(a1,b1), hi=Math.min(a2,b2); return hi>=lo? hi-lo+1:0; }
+function mapSV(gene, sv){
+const res={sv, hits:[], cls:'outside', intron:null, whole:false, flags:[], frame:null, past5bp:0, past3bp:0};
+let s=sv.start, e=sv.end;
+if(stripChr(sv.chrom)!==stripChr(gene.chrom)){
+if(sv.alt && stripChr(sv.alt.chrom)===stripChr(gene.chrom)){ s=Math.min(sv.alt.start,sv.alt.end); e=Math.max(sv.alt.start,sv.alt.end); res.viaAlt=true; res.flags.push('partner breakpoint (chr'+sv.alt.chrom+') on this gene'); }
+else { res.cls='otherchrom'; return res; }
+}
+const n=gene.exons.length;
+gene.exons.forEach(x=>{
+const o=ovl(s,e,x.s1,x.e1);
+if(o>0) res.hits.push({num:x.num, full: s<=x.s1 && e>=x.e1, ov:o,
+codingOv: x.codingLen>0 ? ovl(s,e,x.cdsS1,x.cdsE1) : 0, exon:x});
+});
+res.hits.sort((a,b)=>a.num-b.num);
+res.whole = s<=gene.gS && e>=gene.gE;
+if(!res.hits.length){
+for(const it of gene.introns){ if(s>=it.lo && e<=it.hi){ res.cls='intronic'; res.intron=it.num; break; } }
+if(res.cls==='intronic') res.flags.push('within intron '+res.intron);
+return res;
+}
+res.cls='exonic';
+res.first=res.hits[0].num; res.last=res.hits[res.hits.length-1].num;
+res.fullNums=res.hits.filter(h=>h.full).map(h=>h.num);
+res.partialNums=res.hits.filter(h=>!h.full).map(h=>h.num);
+res.codingNt=res.hits.reduce((a,h)=>a+h.codingOv,0);
+res.codingExons=res.hits.filter(h=>h.codingOv>0).length;
+res.pctCds = gene.cdsLen>0 ? 100*res.codingNt/gene.cdsLen : null;
+res.atgHit = !!(gene.atg && ovl(s,e,gene.atg[0],gene.atg[1])>0);
+res.stopHit= !!(gene.stop && ovl(s,e,gene.stop[0],gene.stop[1])>0);
+res.startExon = res.hits.some(h=>h.exon.isStart && h.codingOv>0);
+res.stopExon = res.hits.some(h=>h.exon.isStop && h.codingOv>0);
+res.lastExon = res.hits.some(h=>h.num===n);
+res.pultExon = n>1 && res.hits.some(h=>h.num===n-1);
+res.utrOnly = res.codingNt===0;
+res.partial = res.partialNums.length>0;
+// beyond transcript ends (5'/3' in transcript orientation)
+const beyondLow = s<gene.gS, beyondHigh = e>gene.gE;
+const lowBp=Math.max(0,gene.gS-s), highBp=Math.max(0,e-gene.gE);
+res.past5bp = gene.strand==='+' ? lowBp : highBp;
+res.past3bp = gene.strand==='+' ? highBp : lowBp;
+const past5 = gene.strand==='+' ? beyondLow : beyondHigh;
+const past3 = gene.strand==='+' ? beyondHigh : beyondLow;
+if(res.whole) res.flags.push('whole transcript');
+else { if(past5) res.flags.push('extends past 5\u2032 end'); if(past3) res.flags.push('extends past 3\u2032 end'); }
+if(!res.whole){
+const isDel=sv.type==='DEL', isDup=sv.type==='DUP';
+const verb = isDel ? 'removes/disrupts' : (isDup ? 'duplicates/spans' : 'spans');
+if(res.atgHit) res.flags.push(verb+' ATG');
+else if(res.startExon) res.flags.push('includes ATG exon');
+if(res.stopHit) res.flags.push(verb+' stop codon');
+else if(res.stopExon) res.flags.push('includes stop exon');
+if(res.lastExon) res.flags.push('includes last exon');
+else if(res.pultExon) res.flags.push('includes penultimate exon');
+}
+if(res.partial) res.flags.push('breakpoint inside exon');
+if(res.utrOnly) res.flags.push('UTR/non-coding only');
+res.frame=frameCall(gene,res);
+return res;
+}
+/* Frame consequence. Priority: whole > ATG > stop > coding-nt mod 3 */
+function frameCall(gene,r){
+const t=r.sv.type;
+if(t!=='DEL' && t!=='DUP') return {kind:'na', text:'not assessed ('+t+')'};
+if(r.whole) return {kind:'whole', text: t==='DEL'?'whole transcript deleted':'whole-transcript duplication'};
+if(r.codingNt===0) return {kind:'none', text:'no coding sequence affected'};
+const mod=r.codingNt%3, approx=r.partial, pre=approx?'~':'';
+const nt=' ('+r.codingNt+' coding nt; mod 3 = '+mod+')';
+if(t==='DEL'){
+if(r.atgHit) return {kind:'startloss', mod, approx, text:'start codon lost \u2014 use start-loss/reinitiation logic'+nt};
+if(r.stopHit) return {kind:'stoploss', mod, approx, text:'stop codon lost \u2014 consider read-through/last-exon rules'+nt};
+return {kind: mod===0?'in':'out', mod, approx, text: pre+(mod===0?'in-frame':'out-of-frame')+nt};
+}
+if(r.startExon || r.stopExon)
+return {kind:'dupfirstlast', mod, approx,
+text:'includes first/last coding exon \u2014 not intragenic, tandem orientation not assumed'+nt};
+return {kind: mod===0?'in':'out', mod, approx, text: pre+(mod===0?'in-frame':'out-of-frame')+' if tandem'+nt};
+}
+function exonLabel(r){
+if(r.cls!=='exonic') return '';
+return r.first===r.last ? 'E'+r.first : 'E'+r.first+'\u2013E'+r.last;
+}
+function coverageLabel(r){
+if(r.cls!=='exonic') return '';
+const f=r.fullNums.length, p=r.partialNums.length, tot=r.last-r.first+1;
+if(p===0) return tot+' exon'+(tot>1?'s':'')+', all full';
+return f+' full, partial: E'+r.partialNums.join(', E');
+}
+
+/* ---------- filters, burden, query ---------- */
+function typeGroup(t){ return (t==='DEL'||t==='DUP') ? t : 'OTHER'; }
+function applyFilters(svs, o){
+return svs.filter(v=>{
+if(o.types && !o.types[typeGroup(v.type)]) return false;
+if(o.passOnly && v.filter && !/^PASS$/i.test(v.filter) && v.filter!=='.') return false;
+if(o.minAC>0 && (v.ac===null || v.ac<o.minAC)) return false;
+if(o.text && !String(v.id).toLowerCase().includes(o.text.toLowerCase())) return false;
+return true;
+});
+}
+function exonBurden(gene, mapped){
+const b={}; gene.exons.forEach(x=>b[x.num]={DEL:{n:0,ac:0},DUP:{n:0,ac:0},OTHER:{n:0,ac:0}});
+mapped.forEach(r=>{
+if(r.cls!=='exonic') return;
+const k=typeGroup(r.sv.type);
+r.hits.forEach(h=>{ b[h.num][k].n++; b[h.num][k].ac+=(r.sv.ac||0); });
+});
+return b;
+}
+/* query exons qa..qb (inclusive), qtype 'DEL'|'DUP'|'ANY' */
+function classifyAgainstQuery(mapped, qa, qb, qtype){
+const lo=Math.min(qa,qb), hi=Math.max(qa,qb);
+const out={same:[],superset:[],samePartial:[],partial:[]};
+const qset=[]; for(let i=lo;i<=hi;i++) qset.push(i);
+mapped.forEach(r=>{
+if(r.cls!=='exonic') return;
+if(qtype!=='ANY' && r.sv.type!==qtype) return;
+const hit=new Set(r.hits.map(h=>h.num)), full=new Set(r.fullNums);
+if(!qset.some(n=>hit.has(n))) return;
+const coversAllFull=qset.every(n=>full.has(n));
+const sameSet= hit.size===qset.length && qset.every(n=>hit.has(n));
+// "same" = exactly the query exons AND breakpoints inside this gene (not past either transcript end)
+const beyond = r.past5bp>0 || r.past3bp>0;
+if(coversAllFull && sameSet && !beyond) out.same.push(r);
+else if(coversAllFull) out.superset.push(r);
+else if(sameSet) out.samePartial.push(r);
+else out.partial.push(r);
+});
+return out;
+}
+function fmtBp(n){ return n<1000? n+' bp' : (n<1e6? (n/1e3).toFixed(n<1e4?1:0)+' kb' : (n/1e6).toFixed(2)+' Mb'); }
+/* Why an SV is larger than the query: extra exons on either side and/or distance past the gene ends */
+function extentNote(r, qa, qb){
+if(!r || r.cls!=='exonic') return '';
+const lo=Math.min(qa,qb), hi=Math.max(qa,qb), parts=[];
+const nums=r.hits.map(h=>h.num), before=nums.filter(n=>n<lo), after=nums.filter(n=>n>hi);
+const span=a=>'E'+Math.min(...a)+(a.length>1?'\u2013E'+Math.max(...a):'');
+if(before.length) parts.push('+'+span(before));
+if(after.length) parts.push('+'+span(after));
+if(r.past5bp>0) parts.push(fmtBp(r.past5bp)+' past 5\u2032 end');
+if(r.past3bp>0) parts.push(fmtBp(r.past3bp)+' past 3\u2032 end');
+return parts.join('; ');
+}
+function sumAC(list){ let t=0, any=false; list.forEach(r=>{ if(r.sv.ac!==null){ t+=r.sv.ac; any=true; } }); return any? t:null; }
+
+/* build mismatch heuristic: gnomAD gene pages list SVs overlapping the gene, so most should overlap */
+function buildCheck(mapped){
+const same=mapped.filter(r=>r.cls!=='otherchrom');
+if(same.length<3) return null;
+const off=same.filter(r=>r.cls==='outside').length;
+return off/same.length>0.5 ? {off, total:same.length} : null;
+}
+
+/* ---------- gnomAD GraphQL API helpers (pure; network code lives in the UI) ---------- */
+const GNOMAD_SV_DATASETS={
+v4:{id:'gnomad_sv_r4', ref:'GRCh38', build:'hg38', label:'gnomAD SV v4.1'},
+v2:{id:'gnomad_sv_r2_1', ref:'GRCh37', build:'hg19', label:'gnomAD SV v2.1'}
+};
+const SV_API_WANTED=['variant_id','chrom','pos','end','chrom2','pos2','end2','length','type','ac','an','af','ac_hom','homozygote_count','filters','consequence','major_consequence'];
+const SV_API_REQUIRED=['variant_id','pos','end','type','ac'];
+function cleanSymbol(s){ return String(s||'').trim().replace(/[^A-Za-z0-9_.\-]/g,''); }
+function buildSvQuery(symbol, ds, fields){
+return '{ gene(gene_symbol: "'+cleanSymbol(symbol)+'", reference_genome: '+ds.ref+') { gene_id symbol '+
+'structural_variants(dataset: '+ds.id+') { '+fields.join(' ')+' } } }';
+}
+/* field names gnomAD rejected, from messages like: Cannot query field "x" on type "StructuralVariant". */
+function unknownFieldsFromErrors(errors){
+const out=[];
+(errors||[]).forEach(e=>{ const m=String(e&&e.message||'').match(/Cannot query field\s+["\u201c']?([A-Za-z0-9_]+)["\u201d']?\s+on type/i); if(m) out.push(m[1]); });
+return out;
+}
+function unwrapType(t){ while(t && (t.kind==='LIST'||t.kind==='NON_NULL')) t=t.ofType; return t && t.name || null; }
+/* API records -> the same CSV a manual export would give, so it goes through the normal table parser */
+function apiSVsToTable(svs){
+const head=['Variant ID','Chrom','Position','End','Size','Class','Allele Count','Allele Number','Allele Frequency','Homozygote Count','Filter','Consequence'];
+const q=v=>{ const s=(v===undefined||v===null)?'':String(v); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; };
+const rows=(svs||[]).map(v=>{
+const filt = Array.isArray(v.filters) ? (v.filters.length? v.filters.join(';') : 'PASS') : (v.filters||'');
+const hom = (v.ac_hom!==undefined&&v.ac_hom!==null) ? v.ac_hom : (v.homozygote_count!==undefined? v.homozygote_count : '');
+const af = (v.af!==undefined&&v.af!==null) ? v.af : ((v.ac!=null && v.an)? v.ac/v.an : '');
+const csq = v.consequence!==undefined&&v.consequence!==null ? v.consequence : (v.major_consequence||'');
+const pos = v.chrom2 && v.pos2!=null ? v.chrom+':'+v.pos+'-'+v.end+'|'+v.chrom2+':'+v.pos2+'-'+(v.end2!=null?v.end2:v.pos2) : v.pos;
+const len = (v.length!=null && v.length<0) ? '' : v.length;
+return [v.variant_id, v.chrom, pos, v.end, len, v.type, v.ac, v.an, af, hom, filt, csq].map(q).join(',');
+});
+return [head.join(',')].concat(rows).join('\n');
+}
+
+const api={stripChr,toInt,parseSize,parseIntList,buildGene,parseGenePredRow,geneFromUcscItem,
+parseDelimited,normHeader,looksLikeHeader,autoMap,parseRange,parsePoint,normType,rowsToSVs,parseQuickList,parseSVText,
+mapSV,frameCall,exonLabel,coverageLabel,typeGroup,applyFilters,exonBurden,classifyAgainstQuery,extentNote,fmtBp,sumAC,buildCheck,
+FIELD_ALIASES,FIELD_LABELS,GNOMAD_SV_DATASETS,SV_API_WANTED,SV_API_REQUIRED,cleanSymbol,buildSvQuery,unknownFieldsFromErrors,unwrapType,apiSVsToTable};
+if(typeof module!=='undefined' && module.exports) module.exports=api;
+
+window.SVX=api;
+})();
+</script>
+<script>
+/* ===== gnomAD SV exon mapper: interface ===== */
+(function(){
+'use strict';
+const L = window.SVX;
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s===undefined||s===null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtInt = n => (n===null||n===undefined||isNaN(n)) ? '\u2014' : Number(n).toLocaleString('en-US');
+const fmtAF = n => (n===null||n===undefined) ? '\u2014' : (n===0?'0': (n<0.001? n.toExponential(2) : n.toPrecision(3)));
+const fmtSize = n => n<1000 ? n+' bp' : (n<1e6 ? (n/1e3).toFixed(n<1e4?2:1)+' kb' : (n/1e6).toFixed(2)+' Mb');
+
+/* ---------- demo data (synthetic SVs on a real transcript model) ---------- */
+const DEMO_ROW='ENST00000217244.9\tchr20\t-\t472497\t543790\t483960\t508551\t14\t'+
+'472497,486375,487426,488677,489779,492253,495718,497720,499254,499832,505117,508450,527932,543671,\t'+
+'484076,486462,487575,488778,489881,492364,495802,497780,499305,499934,505229,508660,528049,543790,\tP68400\tuc002wdw.4';
+const DEMO_SV=['Variant ID,Chrom,Position,End,Class,Allele Count,Allele Number,Allele Frequency,Filter',
+'DEMO_DEL_1,20,495000,499400,DEL,3,126000,0.0000238,PASS',
+'DEMO_DEL_2,20,489800,500000,DEL,2,126000,0.0000159,PASS',
+'DEMO_DUP_1,20,486300,488800,DUP,1,126000,0.0000079,PASS',
+'DEMO_DEL_3,20,489000,489500,DEL,5,126000,0.0000397,PASS',
+'DEMO_DEL_4,20,508540,508560,DEL,1,126000,0.0000079,PASS',
+'DEMO_DEL_5,20,472000,486000,DEL,1,126000,0.0000079,PASS',
+'DEMO_DEL_6,20,400000,600000,DEL,2,126000,0.0000159,PASS',
+'DEMO_INV_1,20,495000,499400,INV,1,126000,0.0000079,PASS',
+'DEMO_DUP_2,20,508000,509000,DUP,1,126000,0.0000079,LOW_CALL_RATE',
+'DEMO_DEL_7,20,543600,543800,DEL,4,126000,0.0000317,PASS'].join('\n');
+
+/* ---------- state ---------- */
+const S={ gene:null, geneBuild:'hg38', geneSource:'', fetched:[], lookupSym:'', svOrigin:null, svFetchedSym:null,
+dataset:'v4', svText:'', parsed:null, svsAll:[],
+filters:{types:{DEL:true,DUP:true,OTHER:true}, passOnly:true, minAC:0, text:''},
+sort:'exon', query:{a:null,b:null}, mapped:[], match:null, showAllSv:false };
+const DATASETS={ v4:{label:'gnomAD SV v4.1', build:'hg38'}, v2:{label:'gnomAD SV v2.1', build:'hg19'}, other:{label:'Other source', build:null} };
+const BUILD_NAME={hg38:'GRCh38 (hg38)', hg19:'GRCh37 (hg19)'};
+
+/* ---------- gene history (this page session; most recent first) ---------- */
+const HIST=[]; // {sym, acc, build}
+function addHist(sym, acc, build){
+const s=String(sym||'').trim().toUpperCase(); if(!s) return;
+const old=HIST.find(h=>h.sym===s), i=HIST.indexOf(old);
+if(i>=0) HIST.splice(i,1);
+HIST.unshift({sym:s, acc: acc!==undefined&&acc!==null&&acc!=='' ? acc : (old?old.acc:''), build: build||(old?old.build:'hg38')});
+if(HIST.length>15) HIST.length=15;
+renderHist();
+}
+function renderHist(){
+$('#geneHist').innerHTML=HIST.map(h=>'<option value="'+esc(h.sym)+'">'+esc((h.acc?h.acc+' \u00b7 ':'')+(BUILD_NAME[h.build]||h.build))+'</option>').join('');
+const box=$('#recentGenes');
+if(!HIST.length){ box.hidden=true; box.innerHTML=''; return; }
+box.hidden=false;
+box.innerHTML='<span class="rlbl">Recent</span>'+HIST.map((h,i)=>'<button class="chip" data-i="'+i+'" title="'+esc((h.acc?h.acc+' \u00b7 ':'')+(BUILD_NAME[h.build]||h.build)+' \u2014 click to look up again')+'">'+esc(h.sym)+'</button>').join('')+
+'<button class="chipclear" id="histClear" title="Clear the list">clear</button>';
+box.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
+const h=HIST[+b.dataset.i]; if(!h) return;
+$('#symIn').value=h.sym; $('#accIn').value=h.acc||''; $('#buildIn').value=h.build||'hg38';
+document.querySelector('button.tab[data-panel="pFetch"]').click(); mirrorGene();
+$('#lookupBtn').click();
+}));
+$('#histClear').addEventListener('click',()=>{ HIST.length=0; renderHist(); });
+}
+/* ---------- step guide: 1 gene, 2 Look up, 3 Use, 4 Fetch from gnomAD, 5 Read SVs ---------- */
+function stepState(){
+const sym=$('#symIn').value.trim().toUpperCase();
+const geneSym=S.gene? String(S.gene.name2||'').toUpperCase() : '';
+const otherRoute=!!S.gene && !/UCSC API/.test(S.geneSource); // pasted row or demo: steps 1-3 done another way
+const matches=!!S.gene && (otherRoute || !sym || geneSym===sym);
+const s=[];
+s[1]= !!sym || !!S.gene;
+s[2]= (S.fetched.length>0 && S.lookupSym===sym) || matches;
+s[3]= matches;
+// SVs only count when they belong to the current gene (fetched for it, or pasted by hand)
+s[4]= S.svOrigin==='gnomad' ? (!sym || S.svFetchedSym===sym) : $('#svIn').value.trim()!=='';
+s[5]= s[4] && S.svsAll.length>0 && S.svText===$('#svIn').value;
+return s;
+}
+function updateSteps(){
+const s=stepState(); let next=0;
+for(let i=2;i<=5;i++){ if(!s[i]){ next=i; break; } }
+document.querySelectorAll('.stepb[data-step]').forEach(el=>{
+const k=+el.dataset.step;
+if(k===1||k>5){ el.setAttribute('aria-label','Step '+k); return; } // markers only: route (1), Show (6), Sort (7)
+const done=!!s[k];
+el.classList.toggle('done',done); el.classList.toggle('next',k===next);
+el.textContent = done ? '\u2713' : String(k);
+el.setAttribute('aria-label','Step '+k+(done?' (done)':(k===next?' (next)':'')));
+});
+}
+/* step-2 gene box copies the step-1 gene unless the user has typed their own there */
+function mirrorGene(){
+const sg=$('#svGene'), v=$('#symIn').value.trim();
+if(sg.dataset.auto==='0' && sg.value.trim()!=='') return;
+sg.value=v; sg.dataset.auto='1';
+}
+
+/* Enter runs the matching action; in multi-line boxes use Ctrl/Cmd+Enter */
+function onEnter(sel, btnSel, needMod){
+$(sel).addEventListener('keydown',e=>{
+if(e.key!=='Enter' || e.isComposing) return;
+if(needMod && !(e.ctrlKey||e.metaKey)) return;
+e.preventDefault(); const b=$(btnSel); if(b && !b.disabled) b.click();
+});
+}
+
+/* ---------- transcript: fetch ---------- */
+function setStatus(el,msg,cls){ el.className='status'+(cls?' '+cls:''); el.innerHTML=msg; }
+async function resolveLocus(sym, build){
+const field = build==='hg19' ? 'genomic_pos_hg19' : 'genomic_pos';
+const url='https://mygene.info/v3/query?q=symbol:'+encodeURIComponent(sym)+'&species=human&fields=symbol,name,'+field;
+let r; try{ r=await fetch(url); }catch(e){ const er=new Error('net'); er.host='mygene.info'; er.test=url; throw er; }
+if(!r.ok) throw new Error('Gene lookup failed ('+r.status+').');
+const j=await r.json();
+const hit=(j.hits||[]).find(h=>h[field]);
+if(!hit) throw new Error('No genomic location found for "'+sym+'" on '+build+'.');
+let gp=hit[field]; gp=Array.isArray(gp)? (gp.find(p=>/^(\d{1,2}|X|Y|MT)$/.test(String(p.chr)))||gp[0]) : gp;
+return {chrom:'chr'+String(gp.chr).replace(/^chr/i,''), start:+gp.start, end:+gp.end, symbol:hit.symbol||sym, name:hit.name||''};
+}
+function itemToRaw(it){
+if(it.blockSizes!==undefined && it.chromStarts!==undefined){ // bigGenePred (e.g. UCSC "mane" track)
+const base=+it.chromStart, sizes=L.parseIntList(it.blockSizes), offs=L.parseIntList(it.chromStarts);
+return {name:it.name, name2:it.geneName2||it.name2||'', chrom:it.chrom, strand:it.strand,
+txStart:base, txEnd:+it.chromEnd, cdsStart:+it.thickStart, cdsEnd:+it.thickEnd,
+exonStarts:offs.map(o=>base+o).join(','), exonEnds:offs.map((o,i)=>base+o+sizes[i]).join(','),
+alt:[it.ncbiId].filter(x=>x && x!=='none')};
+}
+return it;
+}
+async function fetchTranscripts(sym, build, locus){
+const pad=2000, s=Math.max(0,locus.start-pad), e=locus.end+pad, symU=sym.toUpperCase();
+// MANE Select first (default), then RefSeq Select/curated. Missing tracks are skipped.
+const tracks = build==='hg38'
+? [['mane','MANE Select'],['ncbiRefSeqSelect','RefSeq Select'],['ncbiRefSeqCurated','RefSeq curated']]
+: [['ncbiRefSeqSelect','RefSeq Select'],['ncbiRefSeqCurated','RefSeq curated'],['refGene','RefSeq (refGene)']];
+const byName=new Map(); let anyOk=false;
+for(const [track,label] of tracks){
+let payload;
+try{
+const url='https://api.genome.ucsc.edu/getData/track?genome='+build+';track='+track+';chrom='+locus.chrom+';start='+s+';end='+e;
+const r=await fetch(url); if(!r.ok) continue; payload=await r.json(); anyOk=true;
+}catch(err){ if(!anyOk && track===tracks[tracks.length-1][0]){ const er=new Error('net'); er.host='api.genome.ucsc.edu';
+er.test='https://api.genome.ucsc.edu/getData/track?genome='+build+';track=ncbiRefSeqCurated;chrom='+locus.chrom+';start='+s+';end='+e; throw er; } continue; }
+let items=payload[track];
+if(items && !Array.isArray(items)) items=Array.isArray(items[locus.chrom])? items[locus.chrom] : [];
+if(!Array.isArray(items)) continue;
+for(const raw of items){
+const it=itemToRaw(raw);
+const names=[it.name2,it.geneName].concat(it.alt||[]).filter(Boolean).map(x=>String(x).toUpperCase());
+if(names.length && !names.includes(symU)) continue;
+if(!it.exonStarts || !it.name) continue;
+if(byName.has(it.name)){ const ex=byName.get(it.name); if(!ex.sources.includes(label)) ex.sources.push(label); continue; }
+let gene; try{ gene=L.geneFromUcscItem(it,label); }catch(_){ continue; }
+gene.name2=sym; gene.altIds=(it.alt||[]).filter(x=>x!==it.name); // matched by symbol above, so use the official symbol
+byName.set(it.name,{gene,source:label,sources:[label]});
+}
+}
+const rank=t=>({'MANE Select':0,'RefSeq Select':1,'RefSeq curated':2,'RefSeq (refGene)':3}[t.source]??4)+(/^NM_|^ENST/.test(t.gene.name)?0:0.5);
+return [...byName.values()].sort((a,b)=>rank(a)-rank(b)||a.gene.name.localeCompare(b.gene.name));
+}
+$('#lookupBtn').addEventListener('click', async ()=>{
+const sym=$('#symIn').value.trim(), build=$('#buildIn').value, st=$('#fetchStatus');
+$('#txWrap').hidden=true; S.fetched=[];
+if(!sym){ setStatus(st,'Enter a gene symbol first.','err'); return; }
+setStatus(st,'<span class="spin"></span>Locating '+esc(sym)+' on '+esc(build)+'\u2026');
+try{
+const locus=await resolveLocus(sym,build);
+setStatus(st,'<span class="spin"></span>Fetching transcripts from UCSC ('+esc(locus.chrom)+')\u2026');
+const tx=await fetchTranscripts(locus.symbol,build,locus);
+if(!tx.length) throw new Error('No RefSeq/MANE transcripts returned for "'+sym+'". Try the other build, or paste a UCSC row.');
+S.fetched=tx; S.lookupSym=sym.toUpperCase();
+$('#txSel').innerHTML=tx.map((t,i)=>'<option value="'+i+'">'+esc(t.gene.name)+(t.gene.altIds&&t.gene.altIds.length?' / '+esc(t.gene.altIds.join(', ')):'')+
+' \u2014 '+esc(t.sources.join(' + '))+' \u00b7 '+t.gene.exons.length+' exons \u00b7 '+(t.gene.hasCds? t.gene.aa+' aa':'non-coding')+'</option>').join('');
+$('#txWrap').hidden=false;
+const want=$('#accIn').value.trim().toUpperCase(), base=s=>String(s).toUpperCase().replace(/\.\d+$/,'');
+let note='Found '+tx.length+' transcript'+(tx.length>1?'s':'')+'. '+(tx[0].sources.includes('MANE Select')?'MANE Select ('+esc(tx[0].gene.name)+') is selected. ':'No MANE Select transcript was returned; the top RefSeq transcript is selected. ')+'Press Use (or Enter), or pick another.', cls='ok';
+if(want){
+const ids=t=>[t.gene.name].concat(t.gene.altIds||[]).map(x=>String(x).toUpperCase());
+let i=tx.findIndex(t=>ids(t).includes(want));
+if(i>=0){ $('#txSel').value=i; note='Selected '+esc(tx[i].gene.name)+' (exact match). Press Use (or Enter).'; }
+else{
+i=tx.findIndex(t=>ids(t).some(x=>base(x)===base(want)));
+if(i>=0 && !/\.\d+$/.test(want)){ $('#txSel').value=i; note='Selected '+esc(tx[i].gene.name)+' (the version UCSC has). Press Use (or Enter).'; }
+else if(i>=0){ $('#txSel').value=i; cls='err';
+note='UCSC has '+esc(tx[i].gene.name)+', not '+esc(want)+'. Versions can differ in exon structure \u2014 compare exon count/length with your reference, or paste a UCSC row for the exact version.'; }
+else { cls='err'; note=esc(want)+' was not among the transcripts returned. Paste its UCSC row instead, or pick another.'; }
+}
+}
+setStatus(st,note,cls);
+addHist(locus.symbol, $('#accIn').value.trim(), build);
+refresh();
+$('#txSel').focus();
+}catch(err){
+const blocked=err.host || /Failed to fetch|NetworkError|Load failed|CORS|blocked|TypeError/i.test(String(err.message||err));
+const inFrame=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
+setStatus(st, blocked
+? 'Could not reach <b>'+esc(err.host||'MyGene.info / UCSC API')+'</b> from this page.'+
+(inFrame? ' This page seems to be running inside a preview or sandbox, which blocks outside sites \u2014 <b>download the file and open it directly in your browser</b>.' :
+' Your network or firewall may block it.')+
+(err.test? ' Test the connection: <a href="'+esc(err.test)+'" target="_blank" rel="noopener">open this link</a> (it should show text).':'')+
+' Or use <b>Paste UCSC row</b>, which works offline.'
+: esc(err.message||String(err)),'err');
+}
+});
+$('#useTxBtn').addEventListener('click',()=>{
+const t=S.fetched[+$('#txSel').value]; if(!t) return;
+setGene(t.gene, $('#buildIn').value, t.sources.join(' + ')+' via UCSC API');
+addHist(t.gene.name2||$('#symIn').value, t.gene.name, $('#buildIn').value);
+$('#svGene').focus();
+});
+
+/* ---------- transcript: paste / demo ---------- */
+$('#pasteBtn').addEventListener('click',()=>{
+const st=$('#pasteStatus');
+try{
+const g=L.parseGenePredRow($('#rowIn').value);
+setGene(g, $('#pasteBuild').value, 'pasted UCSC row');
+if(g.name2) addHist(g.name2, g.name, $('#pasteBuild').value);
+setStatus(st,'Loaded '+esc(g.name)+' ('+g.exons.length+' exons).','ok');
+}catch(err){ setStatus(st,esc(err.message),'err'); }
+});
+$('#demoBtn').addEventListener('click',()=>{
+const g=L.parseGenePredRow(DEMO_ROW); g.name2='CSNK2A1';
+$('#dataset').value='other'; S.dataset='other';
+$('#svIn').value=DEMO_SV;
+setGene(g,'hg38','demo transcript (CSNK2A1, ENST00000217244.9)');
+readSV();
+});
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+document.querySelectorAll('.tab').forEach(x=>{ x.classList.toggle('active',x===b); x.setAttribute('aria-selected',x===b); });
+document.querySelectorAll('.tabpanel').forEach(p=>p.hidden = p.id!==b.dataset.panel);
+}));
+
+function setGene(g, build, source){
+S.gene=g; S.geneBuild=build; S.geneSource=source;
+const sg=$('#svGene'); if(sg && (!sg.value || sg.dataset.auto==='1') && g.name2){ sg.value=g.name2; sg.dataset.auto='1'; }
+// pick the gnomAD SV dataset that matches the transcript build, unless the user chose "Other"
+if(S.dataset!=='other'){ const want = build==='hg19' ? 'v2' : 'v4'; S.dataset=want; $('#dataset').value=want; }
+S.query={a:null,b:null};
+$('#qa').value=''; $('#qb').value='';
+if(S.svText) readSV(true); else refresh();
+}
+
+/* ---------- SV data ---------- */
+$('#svFile').addEventListener('change',ev=>{
+const f=ev.target.files[0]; if(!f) return;
+const rd=new FileReader(); rd.onload=()=>{ $('#svIn').value=String(rd.result||''); S.svOrigin='paste'; S.svFetchedSym=null; readSV(); }; rd.readAsText(f);
+});
+$('#readBtn').addEventListener('click',()=>{ S.svOrigin='paste'; S.svFetchedSym=null; readSV(); });
+$('#svGene').addEventListener('input',e=>{ e.target.dataset.auto='0'; });
+$('#clearSvBtn').addEventListener('click',()=>{ $('#svIn').value=''; S.svText=''; S.svOrigin=null; S.svFetchedSym=null; S.parsed=null; S.svsAll=[]; $('#svFile').value=''; $('#mapWrap').hidden=true; setStatus($('#svStatus'),''); refresh(); });
+$('#dataset').addEventListener('change',e=>{ S.dataset=e.target.value; refresh(); });
+
+/* ---------- SV data: fetch from gnomAD (GraphQL API) ---------- */
+const GNOMAD_API='https://gnomad.broadinstitute.org/api';
+async function gql(query){
+let r;
+try{ r=await fetch(GNOMAD_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})}); }
+catch(e){ const er=new Error('net'); er.host='gnomad.broadinstitute.org'; throw er; }
+if(r.status===429) throw new Error('gnomAD is limiting requests right now (HTTP 429). Wait a minute and try again.');
+let j; try{ j=await r.json(); }catch(e){ throw new Error('gnomAD returned an unexpected response (HTTP '+r.status+').'); }
+return j;
+}
+async function discoverSvFields(){ // ask gnomAD which SV fields exist; null if it won't say
+try{
+const j=await gql('{ __type(name: "Gene") { fields { name type { name kind ofType { name kind ofType { name kind ofType { name kind } } } } } } }');
+const f=j && j.data && j.data.__type && (j.data.__type.fields||[]).find(x=>x.name==='structural_variants');
+const tn=f && L.unwrapType(f.type); if(!tn) return null;
+const j2=await gql('{ __type(name: "'+tn+'") { fields { name } } }');
+const fl=j2 && j2.data && j2.data.__type && j2.data.__type.fields;
+return fl ? fl.map(x=>x.name) : null;
+}catch(err){ if(err.host) throw err; return null; }
+}
+let gnomadBusy=false;
+$('#gnomadBtn').addEventListener('click', async ()=>{
+if(gnomadBusy) return;
+const st=$('#gnomadStatus'), sym=L.cleanSymbol($('#svGene').value), dsKey=$('#dataset').value;
+if(!sym){ setStatus(st,'Enter a gene symbol.','err'); return; }
+const ds=L.GNOMAD_SV_DATASETS[dsKey];
+if(!ds){ setStatus(st,'Choose gnomAD SV v4.1 or v2.1 in Dataset first.','err'); return; }
+gnomadBusy=true; $('#gnomadBtn').disabled=true;
+setStatus(st,'<span class="spin"></span>Asking '+esc(ds.label)+' for '+esc(sym)+' SVs\u2026');
+try{
+const avail=await discoverSvFields();
+let fields = avail ? L.SV_API_WANTED.filter(f=>avail.includes(f)) : L.SV_API_WANTED.slice();
+const missing=()=>L.SV_API_REQUIRED.filter(f=>!fields.includes(f));
+if(missing().length) throw new Error('gnomAD no longer offers the fields this tool needs ('+missing().join(', ')+'). Use copy/paste for now.');
+for(let attempt=0; attempt<6; attempt++){
+const j=await gql(L.buildSvQuery(sym,ds,fields));
+if(j.errors && j.errors.length){
+const bad=L.unknownFieldsFromErrors(j.errors).filter(f=>fields.includes(f));
+if(bad.length){ fields=fields.filter(f=>!bad.includes(f));
+if(missing().length) throw new Error('gnomAD no longer offers the fields this tool needs ('+missing().join(', ')+'). Use copy/paste for now.');
+continue; }
+const msg=j.errors.map(e=>e.message).join('; ');
+if(/gene not found|not found/i.test(msg)) throw new Error('gnomAD did not find gene "'+sym+'" on '+ds.ref+'. Check the symbol (gnomAD uses current HGNC symbols).');
+throw new Error('gnomAD: '+msg);
+}
+const gene=j.data && j.data.gene;
+if(!gene) throw new Error('gnomAD did not find gene "'+sym+'" on '+ds.ref+'. Check the symbol (gnomAD uses current HGNC symbols).');
+const svs=gene.structural_variants||[];
+$('#svIn').value=L.apiSVsToTable(svs);
+S.dataset=dsKey; S.svOrigin='gnomad'; S.svFetchedSym=String(gene.symbol||sym).toUpperCase(); readSV();
+const link='https://gnomad.broadinstitute.org/gene/'+encodeURIComponent(gene.gene_id||sym)+'?dataset='+ds.id;
+addHist(gene.symbol||sym, undefined, S.geneBuild);
+setStatus(st,'Pulled <b>'+svs.length+'</b> SV'+(svs.length===1?'':'s')+' for '+esc(gene.symbol||sym)+(gene.gene_id?' ('+esc(gene.gene_id)+')':'')+
+' from '+esc(ds.label)+' at '+new Date().toLocaleTimeString()+'. They are in the box below, the same as a pasted export. '+
+'<a href="'+esc(link)+'" target="_blank" rel="noopener">Open this gene on gnomAD</a> to compare the count.'+(S.gene?'':' <b class="nextstep">Next: step 3 \u2014 press Use (left panel) to see these SVs on the exon map.</b>'),'ok');
+return;
+}
+throw new Error('Could not build a query that gnomAD accepts. Use copy/paste for now.');
+}catch(err){
+const inFrame=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
+setStatus(st, err.host
+? 'Could not reach <b>gnomad.broadinstitute.org</b> from this page.'+
+(inFrame? ' This page seems to be running inside a preview or sandbox \u2014 <b>download the file and open it directly in your browser</b>.' :
+' Either your network blocks it, or gnomAD does not accept requests from a page opened on your computer. Check that <a href="https://gnomad.broadinstitute.org/" target="_blank" rel="noopener">gnomad.broadinstitute.org</a> opens in a tab; if it does, use copy/paste (or ask IT/bioinformatics to host this tool on a web server).')
+: esc(err.message||String(err)),'err');
+}finally{ gnomadBusy=false; $('#gnomadBtn').disabled=false; }
+});
+
+function defaultChrom(){ return S.gene? L.stripChr(S.gene.chrom) : ''; }
+function readSV(keepMap){
+S.svText=$('#svIn').value;
+const st=$('#svStatus');
+if(!S.svText.trim()){ S.parsed=null; S.svsAll=[]; setStatus(st,'Paste rows from the gnomAD SV table, or upload an exported CSV.'); refresh(); return; }
+const prevMap = keepMap && S.parsed && S.parsed.format==='table' ? S.parsed.map : null;
+const p=L.parseSVText(S.svText, defaultChrom());
+if(p.format==='table' && prevMap && prevMap.__n===p.headers.length){
+p.map=prevMap; const re=L.rowsToSVs(p.rows,p.map,defaultChrom()); p.svs=re.svs; p.skipped=re.skipped;
+}
+if(p.map) p.map.__n=p.headers.length;
+S.parsed=p; S.svsAll=p.svs;
+renderMapping();
+reportParse();
+refresh();
+}
+function reportParse(){
+const p=S.parsed, st=$('#svStatus');
+let msg='Read <b>'+p.svs.length+'</b> SV'+(p.svs.length===1?'':'s')+' ('+(p.format==='table'?'table with header':'one-per-line list')+').';
+if(p.skipped.length) msg+=' Skipped '+p.skipped.length+' row'+(p.skipped.length>1?'s':'')+' without usable coordinates (row '+p.skipped.slice(0,6).map(x=>x.row).join(', ')+(p.skipped.length>6?', \u2026':'')+').';
+if(p.format==='table' && (p.map.start===undefined)) msg+=' <b>No start/position column was recognised \u2014 set it below.</b>';
+setStatus(st,msg,(p.svs.length?'ok':'err'));
+}
+function renderMapping(){
+const p=S.parsed, w=$('#mapWrap');
+if(!p || p.format!=='table'){ w.hidden=true; return; }
+w.hidden=false;
+const opts=['<option value="-1">(none)</option>'].concat(p.headers.map((h,i)=>'<option value="'+i+'">'+esc(h||('column '+(i+1)))+'</option>')).join('');
+$('#mapGrid').innerHTML=Object.keys(L.FIELD_LABELS).map(f=>
+'<label class="mapf"><span>'+esc(L.FIELD_LABELS[f])+'</span><select data-field="'+f+'">'+opts+'</select></label>').join('');
+$('#mapGrid').querySelectorAll('select').forEach(sel=>{
+const f=sel.dataset.field; sel.value = (p.map[f]===undefined? -1 : p.map[f]);
+sel.addEventListener('change',()=>{
+const v=+sel.value; if(v<0) delete p.map[f]; else p.map[f]=v;
+const re=L.rowsToSVs(p.rows,p.map,defaultChrom()); p.svs=re.svs; p.skipped=re.skipped; S.svsAll=p.svs;
+reportParse(); refresh();
+});
+});
+}
+
+/* ---------- filters / sort ---------- */
+['fDEL','fDUP','fOTHER'].forEach(id=>$('#'+id).addEventListener('change',e=>{ S.filters.types[id.slice(1)]=e.target.checked; refresh(); }));
+/* The query Type and the Show boxes are one setting: the matches use exactly the types shown */
+function qTypeInfo(){
+const on=['DEL','DUP','OTHER'].filter(k=>S.filters.types[k]);
+const name={DEL:'DEL',DUP:'DUP',OTHER:'other SV types'};
+const key= on.length===3?'ALL':(on.length===1?on[0]:(on.length?'MIX':'NONE'));
+const label= key==='ALL'?'any SV type':(key==='NONE'?'no SV type':on.map(k=>name[k]).join(' + '));
+const frame= (S.filters.types.DEL&&S.filters.types.DUP)?' if fully deleted or duplicated in tandem':(key==='DEL'?' if fully deleted':(key==='DUP'?' if duplicated in tandem':''));
+return {key,on,label,frame,short: key==='ALL'||key==='NONE'?'':on.join('+')+' '};
+}
+function syncQType(){
+const sel=$('#qType'), t=qTypeInfo(); let mix=sel.querySelector('option[data-mix]');
+if(t.key==='MIX'||t.key==='NONE'){ if(!mix){ mix=document.createElement('option'); mix.dataset.mix='1'; mix.value='MIX'; mix.disabled=true; sel.appendChild(mix); } mix.textContent=t.key==='NONE'?'None ticked under Show':t.on.join(' + ')+' (from Show)'; }
+else if(mix) mix.remove();
+sel.value=t.key;
+}
+$('#qType').addEventListener('change',e=>{ const v=e.target.value;
+['DEL','DUP','OTHER'].forEach(k=>{ const on= v==='ALL'||v===k; S.filters.types[k]=on; $('#f'+k).checked=on; });
+refresh(); });
+$('#fPass').addEventListener('change',e=>{ S.filters.passOnly=e.target.checked; refresh(); });
+$('#fAC').addEventListener('input',e=>{ S.filters.minAC=Math.max(0,+e.target.value||0); refresh(); });
+$('#fText').addEventListener('input',e=>{ S.filters.text=e.target.value.trim(); refresh(); });
+$('#sortSel').addEventListener('change',e=>{ S.sort=e.target.value; refresh(); });
+
+function sortMapped(list,key){
+const rank=r=> r.cls==='exonic'||r.cls==='intronic' ? 0 : (r.cls==='outside'?1:2);
+const pos=r=> r.cls==='exonic' ? r.first+(r.last-r.first)/1000 : (r.cls==='intronic'? r.intron+0.5 : 1e9);
+return list.slice().sort((a,b)=>{
+const d=rank(a)-rank(b); if(d) return d;
+if(key==='ac') return ((b.sv.ac??-1)-(a.sv.ac??-1)) || pos(a)-pos(b);
+if(key==='size') return b.sv.size-a.sv.size;
+if(key==='pos') return a.sv.start-b.sv.start;
+return pos(a)-pos(b) || a.sv.size-b.sv.size;
+});
+}
+
+/* ---------- main refresh ---------- */
+function refresh(){
+const out=$('#results');
+updateSteps();
+if(!S.gene){
+out.hidden=true; const es=$('#emptyState'); es.hidden=false;
+es.innerHTML = S.svsAll.length
+? '<b>'+S.svsAll.length+' SV'+(S.svsAll.length===1?' is':'s are')+' loaded, but no transcript is in use yet.</b> Finish <span class="stepb inline">3</span> <b>Use</b> in the left panel to see them on the exon map.'
+: (S.fetched.length
+? 'Transcripts found \u2014 pick one and press <span class="stepb inline">3</span> <b>Use</b> to show the exon map.'
+: 'Start under <span class="stepb inline">1</span> <b>Fetch by gene</b>: enter a <span class="stepb inline">2</span> gene symbol and press Look up, then follow the orange numbers. Enter works on every step.');
+return;
+}
+out.hidden=false; $('#emptyState').hidden=true;
+const vis=L.applyFilters(S.svsAll,S.filters);
+S.mapped=sortMapped(vis.map(v=>L.mapSV(S.gene,v)),S.sort);
+renderSummary(vis);
+renderTrack();
+renderQuery();
+renderSvTable();
+renderExonTable();
+}
+
+function renderSummary(vis){
+const g=S.gene, m=S.mapped;
+const c={exonic:0,intronic:0,outside:0,otherchrom:0};
+m.forEach(r=>{ c[r.cls]=(c[r.cls]||0)+1; });
+const ds=DATASETS[S.dataset];
+$('#txSummary').innerHTML=
+'<div class="kv"><span>Transcript</span><b>'+esc(g.name)+'</b>'+(g.name2?' <em>'+esc(g.name2)+'</em>':'')+'</div>'+
+'<div class="kv"><span>Location</span><b>'+esc(g.chrom)+':'+fmtInt(g.gS)+'\u2013'+fmtInt(g.gE)+' ('+g.strand+' strand)</b></div>'+
+'<div class="kv"><span>Build</span><b>'+esc(BUILD_NAME[S.geneBuild]||S.geneBuild)+'</b></div>'+
+'<div class="kv"><span>Exons</span><b>'+g.exons.length+'</b> ('+g.codingExonCount+' coding)</div>'+
+'<div class="kv"><span>CDS</span><b>'+(g.hasCds? fmtInt(g.cdsLen)+' nt \u00b7 '+fmtInt(g.aa)+' aa':'none (non-coding transcript)')+'</b></div>'+
+'<div class="kv"><span>Source</span>'+esc(S.geneSource)+'</div>';
+const shown=S.svsAll.length? vis.length+' of '+S.svsAll.length+' SVs after filters' : 'No SV data loaded yet';
+$('#svSummary').innerHTML='<span class="pill">'+esc(shown)+'</span>'+
+(S.svsAll.length? '<span class="pill exo">'+c.exonic+' overlap exons</span><span class="pill">'+c.intronic+' intronic</span>'+
+(c.outside? '<span class="pill">'+c.outside+' outside transcript</span>':'')+
+(c.otherchrom? '<span class="pill">'+c.otherchrom+' other chromosome</span>':''):'');
+const warns=[];
+if(ds.build && ds.build!==S.geneBuild)
+warns.push(esc(ds.label)+' uses '+esc(BUILD_NAME[ds.build])+', but the transcript is '+esc(BUILD_NAME[S.geneBuild]||S.geneBuild)+'. Coordinates will not line up \u2014 load the transcript on the matching build.');
+if(S.svFetchedSym && g.name2 && S.svFetchedSym!==String(g.name2).toUpperCase())
+warns.push('The SVs were pulled from gnomAD for <b>'+esc(S.svFetchedSym)+'</b>, but the transcript in use is <b>'+esc(g.name2)+'</b>. Fetch again for the right gene, or load the matching transcript.');
+const bc=L.buildCheck(m);
+if(bc) warns.push(bc.off+' of '+bc.total+' SVs fall outside this transcript. gnomAD gene pages list SVs that overlap the gene, so this usually means a build or transcript mismatch.');
+$('#warnBox').innerHTML=warns.map(w=>'<div class="warn">'+w+'</div>').join('');
+}
+
+/* ---------- track ---------- */
+const TYPE_CLASS=t=> t==='DEL'?'tdel':(t==='DUP'?'tdup':'toth');
+function rightTxt(r){ return (r.cls==='exonic'? L.exonLabel(r) : 'intron '+r.intron)+' \u00b7 AC '+fmtInt(r.sv.ac); }
+function fitId(id, px){ // middle-truncate an ID to fit px (monospace ~7 px/char)
+const max=Math.max(6, Math.floor(px/7));
+if(id.length<=max) return id;
+const k=Math.floor((max-1)/2); return id.slice(0,k)+'\u2026'+id.slice(id.length-(max-1-k));
+}
+function renderTrack(){
+const g=S.gene, n=g.exons.length;
+const cw = n<=15?46 : n<=30?34 : n<=60?26 : 22, gap=4, step=cw+gap;
+const PAD=12, W=n*step+gap+2*PAD, LW=300, HH=74, RH=20, BY=24; // BY = top of exon boxes; PAD leaves room for end arrows
+const rows=S.mapped.filter(r=>r.cls==='exonic'||r.cls==='intronic');
+const H=Math.max(rows.length*RH+8, 40);
+const x0=i=>PAD+gap+(i-1)*step; // left edge of exon i
+const has=S.query.a!==null, qa=S.query.a, qb=S.query.b??S.query.a;
+const qlo=has?Math.min(qa,qb):null, qhi=has?Math.max(qa,qb):null;
+const inSel=num=>has && num>=qlo && num<=qhi;
+let h='';
+if(has && qlo>=1 && qhi<=n){ // query bracket + label above the exons
+const xa=x0(qlo)-1, xb=x0(qhi)+cw+1;
+h+='<path class="qbracket" d="M'+xa+','+(BY-2)+' V16 H'+xb+' V'+(BY-2)+'"/>';
+const lbl='query '+qTypeInfo().short+'E'+qlo+(qhi>qlo?'\u2013E'+qhi:'');
+const lw=lbl.length*6.4+14, cx=Math.min(Math.max((xa+xb)/2, lw/2+2), W-lw/2-2);
+h+='<rect class="qlabbg" x="'+(cx-lw/2)+'" y="1" width="'+lw+'" height="14" rx="4"/>';
+h+='<text class="qlab" x="'+cx+'" y="11.5" text-anchor="middle">'+esc(lbl)+'</text>';
+}
+g.exons.forEach(x=>{
+const X=x0(x.num), sel=inSel(x.num);
+h+='<g class="ex'+(sel?' sel':'')+'" data-exon="'+x.num+'"><title>'+esc('E'+x.num+' \u2014 '+x.label+'\n'+g.chrom+':'+fmtInt(x.s1)+'\u2013'+fmtInt(x.e1)+'\n'+fmtInt(x.len)+' bp'+(x.codingLen?(', '+fmtInt(x.codingLen)+' coding nt, phase '+x.phaseIn+'\u2192'+x.phaseOut):'')+'\nClick to set the query range')+'</title>';
+h+='<rect class="exbg" x="'+X+'" y="'+BY+'" width="'+cw+'" height="26" rx="3"/>';
+if(x.kind==='cds'){
+const f=x.codingLen/x.len, cwid=Math.max(3,cw*f);
+const cx = x.isStart&&!x.isStop ? X+cw-cwid : (x.isStop&&!x.isStart ? X : X+(cw-cwid)/2);
+h+='<rect class="excds" x="'+cx.toFixed(1)+'" y="'+BY+'" width="'+cwid.toFixed(1)+'" height="26" rx="3"/>';
+}
+if(sel) h+='<rect class="exselring" x="'+(X-1.5)+'" y="'+(BY-1.5)+'" width="'+(cw+3)+'" height="29" rx="4"/>';
+h+='<text class="exnum" x="'+(X+cw/2)+'" y="'+(BY+17)+'" text-anchor="middle">'+x.num+'</text>';
+if(x.isStart) h+='<text class="exmark" x="'+(X+cw/2)+'" y="'+(BY+40)+'" text-anchor="middle">ATG</text>';
+if(x.isStop) h+='<text class="exmark" x="'+(X+cw/2)+'" y="'+(BY+40)+'" text-anchor="middle">'+(x.isStart?'ATG\u00b7stop':'stop')+'</text>';
+h+='</g>';
+});
+let b='';
+g.exons.forEach(x=>{
+b+='<rect class="col'+(x.num%2?' odd':'')+(inSel(x.num)?' sel':'')+'" x="'+(x0(x.num)-gap/2)+'" y="0" width="'+step+'" height="'+H+'"/>';
+});
+if(has && qlo>=1 && qhi<=n){ // solid edges of the query band
+const ea=x0(qlo)-gap/2, eb=x0(qhi)+cw+gap/2;
+b+='<line class="qedge" x1="'+ea+'" y1="0" x2="'+ea+'" y2="'+H+'"/><line class="qedge" x1="'+eb+'" y1="0" x2="'+eb+'" y2="'+H+'"/>';
+}
+let lab='';
+rows.forEach((r,ri)=>{
+const y=ri*RH+4, tc=TYPE_CLASS(r.sv.type), sv=r.sv;
+const tip=esc(sv.id+'\n'+sv.type+' \u00b7 '+fmtSize(sv.size)+'\nchr'+sv.chrom+':'+fmtInt(sv.start)+'\u2013'+fmtInt(sv.end)+'\n'+
+(r.cls==='exonic'? L.exonLabel(r)+' \u2014 '+L.coverageLabel(r)+(r.frame?'\n'+r.frame.text:'') : 'within intron '+r.intron)+
+((r.past5bp||r.past3bp)? '\nextends '+[r.past5bp?L.fmtBp(r.past5bp)+' past 5\u2032 end':'', r.past3bp?L.fmtBp(r.past3bp)+' past 3\u2032 end':''].filter(Boolean).join(', '):'')+
+'\nAC '+fmtInt(sv.ac)+(sv.af!==null?' \u00b7 AF '+fmtAF(sv.af):'')+(sv.filter?' \u00b7 '+sv.filter:''));
+b+='<g class="row"><title>'+tip+'</title>';
+if(r.cls==='exonic'){
+const xa=x0(r.first)+cw/2, xb=x0(r.last)+cw/2;
+if(r.last>r.first) b+='<rect class="link '+tc+'" x="'+xa+'" y="'+(y+RH/2-3)+'" width="'+(xb-xa)+'" height="4"/>';
+// arrows at the ends when the SV runs past the transcript
+if(r.past5bp>0) b+='<path class="past '+tc+'" d="M'+(x0(1)-2)+','+(y+2)+' l-8,'+((RH-6)/2)+' l8,'+((RH-6)/2)+'z"/>';
+if(r.past3bp>0) b+='<path class="past '+tc+'" d="M'+(x0(n)+cw+2)+','+(y+2)+' l8,'+((RH-6)/2)+' l-8,'+((RH-6)/2)+'z"/>';
+r.hits.forEach(hh=>{
+b+='<rect class="cell '+tc+(hh.full?'':' part')+'" x="'+x0(hh.num)+'" y="'+(y+2)+'" width="'+cw+'" height="'+(RH-6)+'" rx="2"/>';
+});
+} else {
+const xi=x0(r.intron)+cw+gap/2;
+b+='<path class="intr '+tc+'" d="M'+xi+','+(y+2)+' l4,'+((RH-6)/2)+' l-4,'+((RH-6)/2)+' l-4,-'+((RH-6)/2)+'z"/>';
+}
+b+='</g>';
+lab+='<g class="lrow"><title>'+tip+'</title><rect class="tbadge '+tc+'" x="6" y="'+(y+3)+'" width="34" height="'+(RH-8)+'" rx="3"/>'+
+'<text class="tbt" x="23" y="'+(y+RH/2+2)+'" text-anchor="middle">'+esc(sv.type.slice(0,4))+'</text>'+
+'<text class="lid" x="46" y="'+(y+RH/2+2)+'">'+esc(fitId(sv.id, LW-46-12-rightTxt(r).length*6.3))+'</text>'+
+'<text class="lac" x="'+(LW-8)+'" y="'+(y+RH/2+2)+'" text-anchor="end">'+esc(rightTxt(r))+'</text></g>';
+});
+if(!rows.length) lab+='<text class="lid" x="12" y="24">'+(S.svsAll.length?'No SVs overlap this transcript':'Load SV data to see rows')+'</text>';
+const grid=$('#trackGrid');
+grid.style.gridTemplateColumns=LW+'px '+W+'px';
+grid.style.gridTemplateRows=HH+'px auto';
+grid.innerHTML=
+'<div class="corner"><div class="cornerTxt">'+(rows.length? rows.length+' SV row'+(rows.length>1?'s':''):'')+'<br><small>exons 5\u2032 \u2192 3\u2032</small></div></div>'+
+'<div class="thead"><svg width="'+W+'" height="'+HH+'" class="hsvg" role="img" aria-label="Exon numbers">'+h+'</svg></div>'+
+'<div class="tlab"><svg width="'+LW+'" height="'+H+'">'+lab+'</svg></div>'+
+'<div class="tbody"><svg width="'+W+'" height="'+H+'">'+b+'</svg></div>';
+grid.querySelectorAll('g.ex').forEach(el=>el.addEventListener('click',()=>pickExon(+el.dataset.exon)));
+}
+function pickExon(num){
+const q=S.query;
+if(q.a===null || (q.a!==null && q.b!==null)){ q.a=num; q.b=null; }
+else q.b=num;
+$('#qa').value=q.a; $('#qb').value=q.b===null? q.a : q.b;
+refresh();
+}
+
+/* ---------- query ---------- */
+['qa','qb'].forEach(id=>$('#'+id).addEventListener('input',()=>{
+const a=parseInt($('#qa').value,10), b=parseInt($('#qb').value,10);
+S.query.a=isNaN(a)?null:a; S.query.b=isNaN(b)?(isNaN(a)?null:a):b; refresh();
+}));
+function renderQuery(){
+const box=$('#qOut'), g=S.gene, q=S.query, t=qTypeInfo();
+syncQType(); S.match=null;
+if(t.key==='NONE'){ box.innerHTML='<p class="warn">Tick at least one SV type under <b>Show</b> (or pick a Type here).</p>'; $('#copyBtn').disabled=true; return; }
+if(q.a===null){ box.innerHTML='<p class="hint">Click an exon number in the track (click a second exon to set a range), or type the exon range of your variant above.</p>'; $('#copyBtn').disabled=true; return; }
+const a=Math.min(q.a,q.b??q.a), b=Math.max(q.a,q.b??q.a), n=g.exons.length;
+if(a<1||b>n){ box.innerHTML='<p class="warn">Exons must be between 1 and '+n+'.</p>'; $('#copyBtn').disabled=true; return; }
+const res=L.classifyAgainstQuery(S.mapped,a,b,'ANY'); // S.mapped already holds only the types ticked under Show
+S.match={a,b,res};
+const qx=g.exons.filter(x=>x.num>=a&&x.num<=b), qcod=qx.reduce((s,x)=>s+x.codingLen,0);
+const groups=[
+['same','Same exon set, every exon fully covered','Equivalent exon content; both breakpoints inside this gene \u2014 listed below'],
+['superset','Larger SV that fully covers all query exons','More exons and/or past the gene \u2014 listed below with the reason'],
+['samePartial','Same exon span, but a breakpoint falls inside an end exon','Not listed \u2014 check breakpoints (Show all)'],
+['partial','Covers only part of the query exons','Not listed \u2014 different exon content (Show all)']];
+let html='<div class="qhead">Query: <b>'+t.label+'</b> of <b>E'+a+(b>a?'\u2013E'+b:'')+'</b> \u00b7 '+
+(qcod? fmtInt(qcod)+' coding nt'+(t.frame? ', '+(qcod%3===0?'in-frame':'out-of-frame')+t.frame:'') : 'non-coding exon(s)')+'</div>';
+html+='<table class="qt"><thead><tr><th class="l">Match</th><th>SVs</th><th class="k kl kr" title="Sum of the allele counts (AC) of the SVs in this group">Total allele count</th></tr></thead><tbody>';
+groups.forEach(([k,label,sub])=>{
+const list=res[k], ac=L.sumAC(list);
+html+='<tr class="'+(k==='same'||k==='superset'?'strong':'')+(list.length?'':' zero')+'"><td class="l">'+label+'<div class="sub">'+sub+'</div></td><td>'+list.length+'</td><td class="k kl kr">'+fmtInt(ac)+'</td></tr>';
+});
+html+='</tbody></table>';
+box.innerHTML=html;
+const ds=DATASETS[S.dataset];
+const sameAC=L.sumAC(res.same), supAC=L.sumAC(res.superset);
+S.summaryText=(ds.label==='Other source'?'SV source not specified':ds.label)+', '+(g.name2?g.name2+' ':'')+g.name+' ('+(BUILD_NAME[S.geneBuild]||S.geneBuild)+'). '+
+'Query: '+t.label+' of exon'+(b>a?'s '+a+'\u2013'+b:' '+a)+'. '+
+'SVs with the same exons fully covered: '+res.same.length+(sameAC!==null?' (total AC '+sameAC+')':'')+'; '+
+'larger SVs fully covering these exons (more exons and/or extending past the gene): '+res.superset.length+(supAC!==null?' (total AC '+supAC+')':'')+'; '+
+'same span with a breakpoint inside an end exon: '+res.samePartial.length+'; partial overlap: '+res.partial.length+'. '+
+'Filters: types '+Object.keys(S.filters.types).filter(k=>S.filters.types[k]).join('/')+(S.filters.passOnly?', gnomAD quality filter PASS only':', including SVs that failed gnomAD quality filters')+(S.filters.minAC?', AC \u2265 '+S.filters.minAC:'')+'. '+
+'Exon mapping by gnomAD SV exon mapper; verify against the gnomAD record.';
+$('#copyBtn').disabled=false;
+}
+$('#copyBtn').addEventListener('click',async()=>{
+const t=S.summaryText||'';
+try{ await navigator.clipboard.writeText(t); flash('#copyBtn','Copied'); }
+catch(_){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); flash('#copyBtn','Copied');}catch(e){} ta.remove(); }
+});
+function flash(sel,txt){ const b=$(sel), o=b.textContent; b.textContent=txt; setTimeout(()=>b.textContent=o,1400); }
+
+/* ---------- tables ---------- */
+function frameClass(f){ if(!f) return ''; return {in:'fin',out:'fout',startloss:'fout',stoploss:'fout',whole:'fout',dupfirstlast:'fwarn',none:'',na:''}[f.kind]||''; }
+function whereLabel(r){ return r.cls==='exonic'? L.exonLabel(r) : ({intronic:'intron '+r.intron, outside:'outside transcript', otherchrom:'other chromosome'}[r.cls]); }
+const MATCH_LABEL={same:'Same exon set',superset:'Larger SV',samePartial:'Same span, breakpoint in exon',partial:'Partial overlap'};
+/* rows for SV details: with a query, only "same exon set" + "larger SV"; otherwise (or on request) every shown SV */
+function svDetailRows(){
+const M=S.match, grp=new Map();
+if(M) ['same','superset','samePartial','partial'].forEach(k=>M.res[k].forEach(r=>grp.set(r,k)));
+const rows=(M && !S.showAllSv)
+? [...M.res.same.map(r=>({r,k:'same'})), ...sortMapped(M.res.superset,S.sort).map(r=>({r,k:'superset'}))]
+: S.mapped.map(r=>({r,k:grp.get(r)||''}));
+return rows.map(o=>Object.assign(o,{why: o.k&&o.k!=='same'&&M? L.extentNote(o.r,M.a,M.b):''}));
+}
+const SV_HEAD=['Match','Variant ID','Type','Location','Size','Exons','Coverage','Frame / consequence','Allele count','Total allele number','AF','Hom'];
+const SV_TITLE={'Match':'How the SV relates to the query exons','Type':'SV class (see Abbreviations)','Frame / consequence':'Frame estimate; extra flags in grey','Allele count':'AC: number of alternate alleles observed','Total allele number':'AN: total number of alleles genotyped at this site','AF':'Allele frequency (AC / AN)','Hom':'Homozygous individuals'};
+const KEY_COLS={8:'k kl',9:'k',10:'k',11:'k kr'};
+function renderSvTable(){
+const M=S.match, rows=svDetailRows(), tbl=$('#svTable'), note=$('#svNote');
+const toggle= M? ' <button class="s" id="svAllBtn">'+(S.showAllSv?'Show matched only':'Show all '+S.mapped.length+' SVs')+'</button>' : '';
+if(M){
+const r=M.res, nm=r.same.length+r.superset.length;
+$('#svCount').textContent= S.showAllSv? S.mapped.length+' SVs shown' : nm+' matched · E'+M.a+(M.b>M.a?'\u2013E'+M.b:'');
+note.innerHTML= (r.samePartial.length||r.partial.length? 'Not listed: '+r.samePartial.length+' with a breakpoint inside an end exon, '+r.partial.length+' partial overlap.':'')+toggle;
+} else {
+$('#svCount').textContent= S.showAllSv? S.mapped.length+' SVs shown':'';
+note.innerHTML='';
+}
+if(!M && !S.showAllSv){
+tbl.innerHTML='<tbody><tr><td class="l muted">Pick the exons of your variant (click exon numbers on the map, or type them above) to list the matching SVs here.'+
+(S.mapped.length?' <button class="s" id="svAllBtn">Show all '+S.mapped.length+' SVs</button>':'')+'</td></tr></tbody>';
+} else if(!rows.length){
+tbl.innerHTML='<tbody><tr><td class="l muted">'+(M?'No SV with the same exon set or larger covers E'+M.a+(M.b>M.a?'\u2013E'+M.b:'')+' for '+esc(qTypeInfo().label)+'.':'No SVs to show.')+'</td></tr></tbody>';
+} else {
+tbl.innerHTML='<thead><tr>'+SV_HEAD.map((h,i)=>'<th class="'+(i<=7?'l ':'')+(KEY_COLS[i]||'')+'"'+(SV_TITLE[h]?' title="'+esc(SV_TITLE[h])+'"':'')+'>'+h+'</th>').join('')+'</tr></thead><tbody>'+
+rows.map(({r,k,why})=>{ const sv=r.sv;
+const cells=[
+'<td class="l mt">'+(k?esc(MATCH_LABEL[k]):'<span class="muted">\u2014</span>')+(why?'<span class="why">'+esc(why)+'</span>':'')+'</td>',
+'<td class="l mono">'+esc(sv.id)+(sv.filter && !/^(PASS|\.)$/i.test(sv.filter)?'<span class="tag flt" title="Failed gnomAD quality filter">'+esc(sv.filter)+'</span>':'')+'</td>',
+'<td class="l '+TYPE_CLASS(sv.type)+'-t">'+esc(sv.type)+'</td>',
+'<td class="l nw">'+esc('chr'+sv.chrom+':'+fmtInt(sv.start)+'\u2013'+fmtInt(sv.end)+(sv.alt?' | chr'+sv.alt.chrom+':'+fmtInt(sv.alt.start):''))+'</td>',
+'<td class="l nw">'+esc(fmtSize(sv.size))+'</td>',
+'<td class="l">'+esc(whereLabel(r))+'</td>',
+'<td class="l">'+esc(r.cls==='exonic'? L.coverageLabel(r):'')+'</td>',
+'<td class="l '+frameClass(r.frame)+'">'+esc(r.frame? r.frame.text:'')+(r.flags.length?'<span class="fl">'+esc(r.flags.join('; '))+'</span>':'')+'</td>',
+'<td class="k kl">'+esc(fmtInt(sv.ac))+'</td>','<td class="k">'+esc(fmtInt(sv.an))+'</td>','<td class="k">'+esc(fmtAF(sv.af))+'</td>','<td class="k kr">'+esc(fmtInt(sv.hom))+'</td>'];
+return '<tr class="'+(r.cls==='exonic'?'':'dim')+'">'+cells.join('')+'</tr>'; }).join('')+'</tbody>';
+}
+const b=$('#svAllBtn'); if(b) b.addEventListener('click',()=>{ S.showAllSv=!S.showAllSv; renderSvTable(); });
+}
+function renderExonTable(){
+const g=S.gene, bur=L.exonBurden(g,S.mapped);
+const qa=S.query.a, qb=S.query.b??S.query.a, lo=qa?Math.min(qa,qb):null, hi=qa?Math.max(qa,qb):null;
+$('#exTable').innerHTML='<thead><tr><th class="l">Exon</th><th class="l">Type</th><th class="l">Genomic (1-based)</th><th>Length</th><th>Coding nt</th><th>Phase</th><th title="Number of deletions overlapping the exon / their total allele count">DEL n / AC</th><th title="Number of duplications / total allele count">DUP n / AC</th><th title="Number of other SV classes / total allele count">Other n / AC</th></tr></thead><tbody>'+
+g.exons.map(x=>{ const bb=bur[x.num], cell=o=> o.n? o.n+' / '+fmtInt(o.ac) : '<span class="muted">0</span>';
+return '<tr class="'+(lo&&x.num>=lo&&x.num<=hi?'qsel':'')+'"><td class="l"><b>E'+x.num+'</b>'+(x.isStart?' <span class="tag">ATG</span>':'')+(x.isStop?' <span class="tag">stop</span>':'')+'</td>'+
+'<td class="l '+(x.kind==='cds'?'':'muted')+'">'+esc(x.label)+'</td><td class="l mono">'+esc(g.chrom)+':'+fmtInt(x.s1)+'\u2013'+fmtInt(x.e1)+'</td>'+
+'<td>'+fmtInt(x.len)+'</td><td>'+(x.codingLen?fmtInt(x.codingLen):'<span class="muted">0</span>')+'</td><td>'+(x.codingLen?x.phaseIn+'\u2192'+x.phaseOut:'\u2014')+'</td>'+
+'<td>'+cell(bb.DEL)+'</td><td>'+cell(bb.DUP)+'</td><td>'+cell(bb.OTHER)+'</td></tr>'; }).join('')+'</tbody>';
+}
+
+/* ---------- CSV export ---------- */
+function csvLine(a){ return a.map(v=>{ const s=String(v===undefined||v===null?'':v); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }).join(','); }
+function download(name,text){
+const blob=new Blob([text],{type:'text/csv'}), a=document.createElement('a');
+a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+$('#expSv').addEventListener('click',()=>{
+if(!S.gene) return;
+const lines=[csvLine(['Match','Why larger','Variant ID','Type','Chrom','Start','End','Size (bp)','Exons','First exon','Last exon','Fully covered exons','Partially covered exons','Coding nt','% CDS','Frame / consequence','Flags','AC','AN','AF','Hom','Filter','Transcript','Build'])];
+const rows=(!S.match && !S.showAllSv)? S.mapped.map(r=>({r,k:'',why:''})) : svDetailRows();
+rows.forEach(({r,k,why})=>{ const sv=r.sv; lines.push(csvLine([k?MATCH_LABEL[k]:'',why,sv.id,sv.type,sv.chrom,sv.start,sv.end,sv.size,
+r.cls==='exonic'?L.exonLabel(r):r.cls+(r.intron?' '+r.intron:''), r.first||'', r.last||'',
+(r.fullNums||[]).join(' '),(r.partialNums||[]).join(' '), r.codingNt??'', r.pctCds!=null? r.pctCds.toFixed(2):'',
+r.frame?r.frame.text:'', r.flags.join('; '), sv.ac??'', sv.an??'', sv.af??'', sv.hom??'', sv.filter, S.gene.name, S.geneBuild])); });
+const M=S.match, tag= M && !S.showAllSv ? '_matches_E'+M.a+(M.b>M.a?'-E'+M.b:'')+(qTypeInfo().short?'_'+qTypeInfo().short.trim().replace('+','_'):'') : '';
+download((S.gene.name2||S.gene.name)+'_SV_exon_map'+tag+'.csv', lines.join('\n'));
+});
+$('#expEx').addEventListener('click',()=>{
+if(!S.gene) return;
+const bur=L.exonBurden(S.gene,S.mapped), g=S.gene;
+const lines=[csvLine(['Exon','Type','Chrom','Start (1-based)','End','Length','Coding nt','Phase in','Phase out','DEL n','DEL AC','DUP n','DUP AC','Other n','Other AC','Transcript','Build'])];
+g.exons.forEach(x=>{ const b=bur[x.num]; lines.push(csvLine([x.num,x.label,g.chrom,x.s1,x.e1,x.len,x.codingLen,x.codingLen?x.phaseIn:'',x.codingLen?x.phaseOut:'',b.DEL.n,b.DEL.ac,b.DUP.n,b.DUP.ac,b.OTHER.n,b.OTHER.ac,g.name,S.geneBuild])); });
+download((g.name2||g.name)+'_exons.csv', lines.join('\n'));
+});
+
+$('#symIn').addEventListener('input',()=>{ mirrorGene(); updateSteps(); });
+$('#svIn').addEventListener('input',updateSteps);
+$('#svGene').addEventListener('input',updateSteps);
+/* keyboard: Enter / Ctrl+Enter */
+onEnter('#symIn','#lookupBtn'); onEnter('#accIn','#lookupBtn');
+onEnter('#txSel','#useTxBtn');
+onEnter('#svGene','#gnomadBtn');
+onEnter('#rowIn','#pasteBtn',true);
+onEnter('#svIn','#readBtn',true);
+renderHist();
+refresh();
+})();
+
+</script>
+</body>
+</html>
